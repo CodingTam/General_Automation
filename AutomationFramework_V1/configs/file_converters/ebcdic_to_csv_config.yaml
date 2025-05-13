@@ -1,0 +1,14 @@
+# EBCDIC to CSV Converter Configuration
+
+plugins:
+  - name: mainframe_to_csv_converter.py
+    function: run
+    params:
+      input_path: "/path/to/input/ebcdic_data.dat"
+      output_path: "/path/to/output/data.csv"
+      header: true
+      delimiter: ","  # Output CSV delimiter
+      file_type: "ebcdic"  # Specifically using EBCDIC format
+      copybook_path: "/path/to/copybook.cpy"  # Path to the COBOL copybook file
+      codepage: 1047  # EBCDIC codepage
+      append_mode: false 

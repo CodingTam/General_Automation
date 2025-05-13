@@ -1,0 +1,25 @@
+test_case_name: "CSV Converter Fallback Test"
+sid: "TEST_001"
+table_name: "test_table"
+run_type: "unit_test"
+
+source_configuration:
+  source_type: "csv"
+  source_location: "test.csv"
+
+target_configuration:
+  target_type: "spark"
+  target_location: "memory"
+
+validation_types:
+  - "schema"
+  - "count"
+  - "data"
+
+execution_notes: "Test case to verify version fallback mechanism from beta (1.1.2) to stable (1.1.1)"
+
+jira:
+  parent_ticket: "TEST-001"
+  test_plan_ticket: "TEST-002"
+  environment: "TEST"
+  release_name: "R1.0" 

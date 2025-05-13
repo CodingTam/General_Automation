@@ -1,0 +1,35 @@
+sid: S123458
+test_case_name: TC_003
+table_name: os_tos_customer_v0
+run_type: full
+generate_html_report: true
+source_configuration:
+  source_type: csv
+  source_location: hdfs://localhost:9000/data/synthetic_customers_same_format.csv
+  source_version: 1.1.1
+target_configuration:
+  target_type: csv
+  target_location: hdfs://localhost:9000/data/synthetic_customers_same_format.csv
+  target_version: 1.1.1
+validation_types:
+  - schema
+  - count
+  - data
+  - nulls
+  - duplicates
+rules:
+  - column: customer_id
+    validation:
+      type: not_null
+  - column: customer_id
+    validation:
+      type: uniqueness
+jira:
+  parent_ticket: PROJ-001
+  test_plan_ticket: PROJ-002
+  environment: IST
+  release_name: REL-001
+scheduler:
+  enabled: 'yes'
+  frequency: daily
+  username: S123455

@@ -1,0 +1,13 @@
+# JSON to CSV Converter Configuration
+
+plugins:
+  - name: json_to_csv_converter.py
+    function: run
+    params:
+      input_path: "/path/to/input/data.json"
+      output_path: "/path/to/output/data.csv"
+      header: true
+      delimiter: ","  # Output CSV delimiter
+      multiline: true  # Set to true if JSON is multiline format
+      flatten: true    # Attempt to flatten nested JSON structures
+      append_mode: false 

@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YAML Test Case Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .form-section {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            border-left: 4px solid transparent;
+            transition: border-left-color 0.3s ease;
+        }
+        .form-section.completed {
+            border-left-color: #28a745;
+        }
+        .form-section h3, .form-section h4 {
+            color: #212529;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+        .form-label {
+            font-size: 0.9rem;
+            margin-bottom: 0.3rem;
+        }
+        .form-control, .form-select {
+            font-size: 0.9rem;
+            padding: 0.375rem 0.75rem;
+            height: calc(1.5em + 0.75rem + 2px);
+        }
+        .test-case-container {
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        .test-case-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin-bottom: 8px;
+        }
+        .test-case-header h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0;
+            color: #212529;
+        }
+        .btn {
+            font-size: 0.9rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .row {
+            margin-bottom: 0.5rem;
+        }
+        .mb-3 {
+            margin-bottom: 0.5rem !important;
+        }
+        .mb-4 {
+            margin-bottom: 1rem !important;
+        }
+        .py-4 {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+        }
+        .container {
+            max-width: 95%;
+        }
+        .form-check {
+            margin-bottom: 0.3rem;
+        }
+        .form-check-label {
+            font-size: 0.9rem;
+        }
+        .form-check-input {
+            width: 1.2em;
+            height: 1.2em;
+        }
+        .form-switch .form-check-input {
+            width: 2em;
+            height: 1em;
+        }
+        .alert-rule-item, .rule-item {
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+        textarea.form-control {
+            min-height: calc(1.5em + 0.75rem + 2px);
+        }
+        .test-case-content {
+            display: none;
+        }
+        .test-case-content.expanded {
+            display: block;
+        }
+        .rule-item {
+            background-color: white;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .rule-item .row {
+            margin: 0;
+        }
+        .validation-params {
+            margin-top: 8px;
+        }
+        .rule-item .btn {
+            margin-left: 8px;
+        }
+        .file-type-specific {
+            display: none;
+        }
+        .btn-add-rule {
+            margin-top: 10px;
+        }
+        .alert-section {
+            transition: all 0.3s ease;
+        }
+        .collapsed {
+            display: none;
+        }
+        .validation-params {
+            display: none;
+            margin-top: 10px;
+        }
+        .key-column-container {
+            margin-bottom: 10px;
+        }
+        .alert-rule-item {
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .rule-item {
+            background-color: white;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .rule-item .row {
+            margin: 0;
+        }
+        .validation-params {
+            transition: all 0.3s ease;
+        }
+        .validation-params > div {
+            width: 100%;
+        }
+        .rule-item .btn {
+            margin-left: 8px;
+        }
+        .threshold-params .d-flex {
+            gap: 8px;
+        }
+        .pattern-params .d-flex {
+            gap: 8px;
+        }
+        .pattern-type {
+            min-width: 120px;
+        }
+        .rule-item {
+            background-color: white;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .rule-item .row {
+            margin: 0;
+            align-items: center;
+        }
+        .validation-params {
+            width: 100%;
+        }
+        .validation-params input {
+            width: 100%;
+        }
+        .threshold-params .d-flex {
+            gap: 8px;
+        }
+        .form-section {
+            transition: border-left-color 0.3s ease;
+        }
+        .btn-outline-danger {
+            padding: 0.375rem 0.75rem;
+        }
+        .g-2 {
+            --bs-gutter-x: 0.5rem;
+            --bs-gutter-y: 0.5rem;
+        }
+        .validation-params, .threshold-params, .regex-params, .pattern-params {
+            margin: 0;
+        }
+        .form-section.has-error {
+            border-left-color: #dc3545 !important;
+            background-color: #fff5f5;
+        }
+        .form-section.has-error h4 {
+            color: #dc3545;
+        }
+        /* Reduce gap between rule entries in Rules section */
+        #rulesContainer .rule-item {
+            margin-bottom: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="text-center mb-4">YAML Test Case Generator</h1>
+        
+        <div class="form-section mb-4">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">SID</label>
+                    <input type="text" class="form-control" id="username" name="sid" placeholder="Enter your SID (e.g., AB12345)" required>
+                </div>
+            </div>
+        </div>
+
+        <div id="testCasesContainer">
+            <!-- Test cases will be added here -->
+        </div>
+
+        <div class="text-center mb-4">
+            <button class="btn btn-primary" onclick="addNewTestCase()">
+                <i class="bi bi-plus-circle"></i> Add New Test Case
+            </button>
+            <button class="btn btn-success" onclick="downloadAllYAML()">
+                <i class="bi bi-download"></i> Download All as YAML
+            </button>
+            <button class="btn btn-info" onclick="saveToLocal()">
+                <i class="bi bi-save"></i> Save
+            </button>
+            <button class="btn btn-warning" onclick="loadFromLocal()">
+                <i class="bi bi-upload"></i> Load
+            </button>
+        </div>
+    </div>
+
+    <!-- Template for a new test case -->
+    <template id="testCaseTemplate">
+        <div class="test-case-container">
+            <div class="test-case-header" onclick="toggleTestCase(this)">
+                <div class="d-flex align-items-center">
+                    <h3 class="mb-0">Test Case <span class="test-case-number"></span></h3>
+                    <span class="ms-2 test-case-name-display"></span>
+                </div>
+                <div>
+                    <button class="btn btn-outline-warning me-2" onclick="resetTestCase(event, this)">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="removeTestCase(event, this)">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="test-case-content">
+                <!-- Test Case Name Section -->
+                <div class="form-section">
+                    <h4>Test Case Name</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control test-case-name" name="test_case_name" placeholder="CB/GTB_VAL_001" required onchange="updateTestCaseName(this)">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scheduler Section -->
+                <div class="form-section" id="schedulerSection">
+                    <h4>Scheduler</h4>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="schedulerToggle">
+                                <label class="form-check-label" for="schedulerToggle">Add to Scheduler</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Scheduler Settings - Hidden by default, shown when toggle is enabled -->
+                    <div class="row mt-2" id="schedulerSettings" style="display: none;">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="schedulerFrequency" class="form-label">Frequency</label>
+                                <select class="form-select" id="schedulerFrequency" onchange="handleFrequencyChange(this)">
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Weekly options - hidden by default -->
+                        <div class="col-md-4" id="weeklyOptions" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label">Day of Week</label>
+                                <select class="form-select" id="schedulerWeekDay">
+                                    <option value="1">Monday</option>
+                                    <option value="2">Tuesday</option>
+                                    <option value="3">Wednesday</option>
+                                    <option value="4">Thursday</option>
+                                    <option value="5">Friday</option>
+                                    <option value="6">Saturday</option>
+                                    <option value="7">Sunday</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Monthly options - hidden by default -->
+                        <div class="col-md-4" id="monthlyOptions" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label">Day of Month</label>
+                                <select class="form-select" id="schedulerMonthDay">
+                                    <option value="1">1st</option>
+                                    <option value="2">2nd</option>
+                                    <option value="3">3rd</option>
+                                    <option value="4">4th</option>
+                                    <option value="5">5th</option>
+                                    <option value="6">6th</option>
+                                    <option value="7">7th</option>
+                                    <option value="8">8th</option>
+                                    <option value="9">9th</option>
+                                    <option value="10">10th</option>
+                                    <option value="11">11th</option>
+                                    <option value="12">12th</option>
+                                    <option value="13">13th</option>
+                                    <option value="14">14th</option>
+                                    <option value="15">15th</option>
+                                    <option value="16">16th</option>
+                                    <option value="17">17th</option>
+                                    <option value="18">18th</option>
+                                    <option value="19">19th</option>
+                                    <option value="20">20th</option>
+                                    <option value="21">21st</option>
+                                    <option value="22">22nd</option>
+                                    <option value="23">23rd</option>
+                                    <option value="24">24th</option>
+                                    <option value="25">25th</option>
+                                    <option value="26">26th</option>
+                                    <option value="27">27th</option>
+                                    <option value="28">28th</option>
+                                    <option value="29">29th</option>
+                                    <option value="30">30th</option>
+                                    <option value="31">31st</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Name Section -->
+                <div class="form-section">
+                    <h4>Table Name</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control table-name" name="table_name" placeholder="Enter table name" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Run Type Configuration -->
+                <div class="form-section">
+                    <h4>Run Type Configuration</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input run-type" type="radio" name="run_type" value="dry" id="dryRun" onchange="handleRunTypeChange(this)">
+                                <label class="form-check-label" for="dryRun">Dry Run</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input run-type" type="radio" name="run_type" value="regression" id="regressionRun" onchange="handleRunTypeChange(this)">
+                                <label class="form-check-label" for="regressionRun">Regression Run</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input run-type" type="radio" name="run_type" value="functional" id="functionalRun" onchange="handleRunTypeChange(this)">
+                                <label class="form-check-label" for="functionalRun">Functional Run</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input run-type" type="radio" name="run_type" value="full" id="fullRun" onchange="handleRunTypeChange(this)">
+                                <label class="form-check-label" for="fullRun">Full Run</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Source Configuration -->
+                <div class="form-section">
+                    <h4>Source Configuration</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input multi-source-enabled" type="checkbox" name="multi_source_enabled" onchange="toggleMultiSource(this)">
+                                <label class="form-check-label">MultiSource</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="source-config-1">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Source Type</label>
+                                <select class="form-select source-type" name="source_type" onchange="handleSourceTypeChange(this)">
+                                    <option value="">Select Source Type</option>
+                                    <option value="csv">CSV</option>
+                                    <option value="psv">PSV</option>
+                                    <option value="json">JSON</option>
+                                    <option value="xml">XML</option>
+                                    <option value="parquet">Parquet</option>
+                                    <option value="avro">Avro</option>
+                                    <option value="mainframe">Mainframe</option>
+                                    <option value="ebcdic">EBCDIC</option>
+                                    <option value="fixedlength">Fixed Length</option>
+                                    <option value="fixedwidth">Fixed Width</option>
+                                    <option value="bigquery">BigQuery</option>
+                                    <option value="hql">HQL Script</option>
+                                    <option value="hive">Hive Table</option>
+                                    <option value="binary">Binary</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label source-location-label">Source Location</label>
+                                <input type="text" class="form-control source-location" name="source_location" required placeholder="Enter source file/table location">
+                            </div>
+                        </div>
+                        <div class="file-type-specific mainframe-specific ebcdic-specific fixedlength-specific fixedwidth-specific">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Copybook Location</label>
+                                    <input type="text" class="form-control copybook-location" name="copybook_location" placeholder="Enter copybook file location">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Supporting File</label>
+                                    <input type="text" class="form-control supporting-file" name="supporting_file" placeholder="Enter supporting file location">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Partition Column (optional)</label>
+                                <input type="text" class="form-control source-partition" name="source_partition" placeholder="Enter source partition column name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Partition Date (optional)</label>
+                                <input type="date" class="form-control source-partition-date" name="source_partition_date">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="source-config-2" style="display: none;">
+                        <hr class="my-4">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Source Type -2</label>
+                                <select class="form-select source-type-2" name="source_type_2" onchange="handleSourceTypeChange2(this)">
+                                    <option value="">Select Source Type</option>
+                                    <option value="csv">CSV</option>
+                                    <option value="psv">PSV</option>
+                                    <option value="json">JSON</option>
+                                    <option value="xml">XML</option>
+                                    <option value="parquet">Parquet</option>
+                                    <option value="avro">Avro</option>
+                                    <option value="mainframe">Mainframe</option>
+                                    <option value="ebcdic">EBCDIC</option>
+                                    <option value="fixedlength">Fixed Length</option>
+                                    <option value="fixedwidth">Fixed Width</option>
+                                    <option value="bigquery">BigQuery</option>
+                                    <option value="hql">HQL Script</option>
+                                    <option value="hive">Hive Table</option>
+                                    <option value="binary">Binary</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label source-location-label-2">Source Location -2</label>
+                                <input type="text" class="form-control source-location-2" name="source_location_2" required placeholder="Enter source file/table location">
+                            </div>
+                        </div>
+                        <div class="file-type-specific-2" style="display: none;">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Copybook Location</label>
+                                    <input type="text" class="form-control copybook-location-2" name="copybook_location_2" placeholder="Enter copybook file location">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Supporting File</label>
+                                    <input type="text" class="form-control supporting-file-2" name="supporting_file_2" placeholder="Enter supporting file location">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Partition Column -2 (optional)</label>
+                                <input type="text" class="form-control source-partition-2" name="source_partition_2" placeholder="Enter source partition column name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Partition Date -2 (optional)</label>
+                                <input type="date" class="form-control source-partition-date-2" name="source_partition_date_2">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Source Processor - Custom -->
+                <div class="form-section">
+                    <h4>Source Processor - Custom</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input source-processor-enabled" type="checkbox" name="source_processor_enabled" onchange="toggleSourceProcessor(this)">
+                                <label class="form-check-label">Enable Custom Source Processor</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="source-processor-section" style="display: none;">
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label">Custom Processor Code</label>
+                                <input type="text" class="form-control source-processor-code" name="source_processor_code" placeholder="Enter the path to your custom processor script">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Schema Definition -->
+                <div class="form-section">
+                    <h4>Schema</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Schema Definition</label>
+                            <textarea class="form-control schema-definition" name="schema_definition" rows="5" placeholder="Enter your schema definition here"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Target Configuration -->
+                <div class="form-section">
+                    <h4>Target Configuration</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Target Type</label>
+                            <select class="form-select target-type" name="target_type" onchange="handleTargetTypeChange(this)">
+                                <option value="">Select Target Type</option>
+                                <option value="csv">CSV</option>
+                                <option value="psv">PSV</option>
+                                <option value="json">JSON</option>
+                                <option value="xml">XML</option>
+                                <option value="parquet">Parquet</option>
+                                <option value="avro">Avro</option>
+                                <option value="mainframe">Mainframe</option>
+                                <option value="ebcdic">EBCDIC</option>
+                                <option value="fixedlength">Fixed Length</option>
+                                <option value="fixedwidth">Fixed Width</option>
+                                <option value="bigquery">BigQuery</option>
+                                <option value="hql">HQL Script</option>
+                                <option value="hive">Hive Table</option>
+                                <option value="binary">Binary</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label target-location-label">Target Location</label>
+                            <input type="text" class="form-control target-location" name="target_location" required placeholder="Enter target file/table location">
+                        </div>
+                    </div>
+                    <div class="target-type-specific" style="display: none;">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Copybook Location</label>
+                                <input type="text" class="form-control copybook-location" name="target_copybook_location">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Supporting File</label>
+                                <input type="text" class="form-control supporting-file" name="target_supporting_file" placeholder="Enter supporting file location">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Partition Column (optional)</label>
+                            <input type="text" class="form-control target-partition" name="target_partition" placeholder="Enter target partition column name">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Partition Date (optional)</label>
+                            <input type="date" class="form-control target-partition-date" name="target_partition_date">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column Names -->
+                <div class="form-section column-names-section" style="display: none;">
+                    <h4>Column Names</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Column Names for Functional Run</label>
+                            <input type="text" class="form-control column-names" name="column_names" placeholder="Enter column names separated by commas (e.g., id, name, age)">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Execution Notes -->
+                <div class="form-section">
+                    <h4>Execution Notes</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Execution Notes (optional)</label>
+                            <textarea class="form-control execution-notes" name="execution_notes" rows="3" placeholder="Enter any additional notes for execution (e.g., dependencies, prerequisites)"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Key Columns -->
+                <div class="form-section">
+                    <h4>Key Columns</h4>
+                    <div id="keyColumnsContainer">
+                        <div class="key-column-container">
+                            <div class="row mb-3">
+                                <div class="col-md-10">
+                                    <input type="text" class="form-control key-column" name="key_column" placeholder="Enter key column name (e.g., id, customer_id)">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger" onclick="removeKeyColumn(this)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary" onclick="addKeyColumn(this)">
+                        <i class="bi bi-plus-circle"></i> Add Key Column
+                    </button>
+                </div>
+
+                <!-- Validation Types -->
+                <div class="form-section">
+                    <h4>Validation Types</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input validation-type" type="checkbox" name="validation_all" value="all" id="allValidation">
+                                <label class="form-check-label" for="allValidation">
+                                    ALL
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input validation-type individual-validation" type="checkbox" name="validation_schema" value="schema" id="schemaValidation">
+                                <label class="form-check-label" for="schemaValidation">
+                                    Schema Validation
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input validation-type individual-validation" type="checkbox" name="validation_count" value="count" id="countValidation">
+                                <label class="form-check-label" for="countValidation">
+                                    Count Validation
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="form-check">
+                                <input class="form-check-input validation-type individual-validation" type="checkbox" name="validation_data" value="data" id="dataValidation">
+                                <label class="form-check-label" for="dataValidation">
+                                    Data Validation
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input validation-type individual-validation" type="checkbox" name="validation_nulls" value="nulls" id="nullValidation">
+                                <label class="form-check-label" for="nullValidation">
+                                    Null Checks
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input validation-type individual-validation" type="checkbox" name="validation_duplicates" value="duplicates" id="duplicateValidation">
+                                <label class="form-check-label" for="duplicateValidation">
+                                    Duplicate Checks
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rules -->
+                <div class="form-section">
+                    <h4>Rules</h4>
+                    <div id="rulesContainer">
+                        <!-- Rules will be added here -->
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-add-rule" onclick="addRule(this)">
+                        <i class="bi bi-plus-circle"></i> Add Rule
+                    </button>
+                </div>
+
+                <!-- Alert Rules -->
+                <div class="form-section alert-rules-section" style="display: none;">
+                    <h4>Alert Rules</h4>
+                    <div id="alertRulesContainer">
+                        <!-- Alert rules will be added here -->
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-add-alert-rule" onclick="addAlertRule(this)">
+                        <i class="bi bi-plus-circle"></i> Add Alert Rule
+                    </button>
+                </div>
+
+                <!-- Jira Information -->
+                <div class="form-section" id="jiraSection">
+                    <h3>Jira Information</h3>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="parentTicket" class="form-label">Parent Ticket #</label>
+                                <input type="text" class="form-control" id="parentTicket" placeholder="PROJ-001">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="testPlanTicket" class="form-label">Test Plan Ticket #</label>
+                                <input type="text" class="form-control" id="testPlanTicket" placeholder="PROJ-002">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="environment" class="form-label">Environment</label>
+                                <select class="form-select" id="environment">
+                                    <option value="IST">IST</option>
+                                    <option value="UAT">UAT</option>
+                                    <option value="PROD">PROD</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="releaseName" class="form-label">Release Name</label>
+                                <input type="text" class="form-control" id="releaseName" placeholder="REL-001">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HTML Report Toggle -->
+                <div class="form-section">
+                    <h4>Reporting Options</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input generate-html-report" type="checkbox" name="generate_html_report" id="generateHtmlReport">
+                                <label class="form-check-label" for="generateHtmlReport">Generate HTML Report</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="text-muted small">When enabled, an HTML report will be generated with detailed validation results.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+    <script>
+        let testCaseCount = 0;
+
+        function addNewTestCase() {
+            const template = document.getElementById('testCaseTemplate');
+            const container = document.getElementById('testCasesContainer');
+            const clone = template.content.cloneNode(true);
+            
+            testCaseCount++;
+            clone.querySelector('.test-case-number').textContent = testCaseCount;
+            
+            // Collapse all existing test cases
+            const existingTestCases = container.querySelectorAll('.test-case-content');
+            existingTestCases.forEach(testCase => {
+                testCase.classList.remove('expanded');
+            });
+            
+            container.appendChild(clone);
+            const newContainer = container.lastElementChild;
+            addSectionCompletionListeners(newContainer);
+        }
+
+        function toggleTestCase(header) {
+            const container = header.closest('.test-case-container');
+            const content = container.querySelector('.test-case-content');
+            
+            // Collapse all other test cases
+            const allTestCases = document.querySelectorAll('.test-case-content');
+            allTestCases.forEach(testCase => {
+                if (testCase !== content) {
+                    testCase.classList.remove('expanded');
+                }
+            });
+            
+            // Toggle current test case
+            content.classList.toggle('expanded');
+        }
+
+        function updateTestCaseName(input) {
+            const container = input.closest('.test-case-container');
+            const nameDisplay = container.querySelector('.test-case-name-display');
+            nameDisplay.textContent = input.value ? `- ${input.value}` : '';
+        }
+
+        function removeTestCase(event, button) {
+            event.stopPropagation(); // Prevent the click from triggering the toggle
+            button.closest('.test-case-container').remove();
+        }
+
+        function handleSourceTypeChange(selectElement) {
+            const sourceType = selectElement.value;
+            const row = selectElement.closest('.row');
+            const fileTypeSpecific = row.nextElementSibling;
+            const locationLabel = row.querySelector('.source-location-label');
+            
+            // Hide all specific sections first
+            fileTypeSpecific.querySelectorAll('.file-type-specific').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Show the relevant section based on source type
+            if (sourceType === 'mainframe' || sourceType === 'ebcdic' || 
+                sourceType === 'fixedlength' || sourceType === 'fixedwidth') {
+                fileTypeSpecific.style.display = 'block';
+            } else {
+                fileTypeSpecific.style.display = 'none';
+            }
+
+            // Update location label for Hive Table
+            if (sourceType === 'hive') {
+                locationLabel.textContent = 'Source Table Name (with Schema)';
+            } else if (sourceType === 'hql') {
+                locationLabel.textContent = 'Source Bitbucket Path';
+            } else {
+                locationLabel.textContent = 'Source Location';
+            }
+        }
+
+        function handleTargetTypeChange(select) {
+            const container = select.closest('.test-case-container');
+            const fileTypeSpecific = container.querySelector('.target-type-specific');
+            const locationLabel = container.querySelector('.target-location-label');
+            
+            const specialFileTypes = ['mainframe', 'ebcdic', 'fixedlength', 'fixedwidth'];
+            if (specialFileTypes.includes(select.value)) {
+                fileTypeSpecific.style.display = 'block';
+            } else {
+                fileTypeSpecific.style.display = 'none';
+            }
+
+            // Update location label based on target type
+            if (select.value === 'hive') {
+                locationLabel.textContent = 'Target Table Name (with Schema)';
+            } else if (select.value === 'hql') {
+                locationLabel.textContent = 'Target Bitbucket Path';
+            } else {
+                locationLabel.textContent = 'Target Location';
+            }
+        }
+
+        function handleSourceTypeChange2(selectElement) {
+            const sourceType = selectElement.value;
+            const container = selectElement.closest('.test-case-container');
+            const fileTypeSpecific = container.querySelector('.file-type-specific-2');
+            const locationLabel = container.querySelector('.source-location-label-2');
+            
+            const specialFileTypes = ['mainframe', 'ebcdic', 'fixedlength', 'fixedwidth'];
+            if (specialFileTypes.includes(sourceType)) {
+                fileTypeSpecific.style.display = 'block';
+            } else {
+                fileTypeSpecific.style.display = 'none';
+            }
+
+            // Update location label for Hive Table
+            if (sourceType === 'hive') {
+                locationLabel.textContent = 'Source Table Name (with Schema) -2';
+            } else if (sourceType === 'hql') {
+                locationLabel.textContent = 'Source Bitbucket Path -2';
+            } else {
+                locationLabel.textContent = 'Source Location -2';
+            }
+        }
+
+        function toggleMultiSource(checkbox) {
+            const container = checkbox.closest('.test-case-container');
+            const sourceConfig2 = container.querySelector('.source-config-2');
+            const sourceProcessorCheckbox = container.querySelector('.source-processor-enabled');
+            const sourceProcessorSection = container.querySelector('.source-processor-section');
+            
+            if (checkbox.checked) {
+                // Reset all source 1 configuration fields
+                container.querySelector('.source-type').value = '';
+                container.querySelector('.source-location').value = '';
+                container.querySelector('.source-partition').value = '';
+                container.querySelector('.source-partition-date').value = '';
+                container.querySelector('.copybook-location').value = '';
+                container.querySelector('.supporting-file').value = '';
+                container.querySelector('.file-type-specific').style.display = 'none';
+
+                // Reset all source 2 configuration fields
+                container.querySelector('.source-type-2').value = '';
+                container.querySelector('.source-location-2').value = '';
+                container.querySelector('.source-partition-2').value = '';
+                container.querySelector('.source-partition-date-2').value = '';
+                container.querySelector('.copybook-location-2').value = '';
+                container.querySelector('.supporting-file-2').value = '';
+                container.querySelector('.file-type-specific-2').style.display = 'none';
+
+                sourceConfig2.style.display = 'block';
+                // Update labels for source 1
+                const sourceTypeLabel = container.querySelector('.source-type').previousElementSibling;
+                const sourceLocationLabel = container.querySelector('.source-location-label');
+                const sourcePartitionLabel = container.querySelector('.source-partition').previousElementSibling;
+                const sourcePartitionDateLabel = container.querySelector('.source-partition-date').previousElementSibling;
+                
+                sourceTypeLabel.textContent = 'Source Type -1';
+                sourceLocationLabel.textContent = 'Source Location -1';
+                sourcePartitionLabel.textContent = 'Partition Column -1 (optional)';
+                sourcePartitionDateLabel.textContent = 'Partition Date -1 (optional)';
+                
+                // Enable and check source processor
+                sourceProcessorCheckbox.checked = true;
+                sourceProcessorSection.style.display = 'block';
+                sourceProcessorCheckbox.disabled = true;
+            } else {
+                sourceConfig2.style.display = 'none';
+                // Reset labels for source 1
+                const sourceTypeLabel = container.querySelector('.source-type').previousElementSibling;
+                const sourceLocationLabel = container.querySelector('.source-location-label');
+                const sourcePartitionLabel = container.querySelector('.source-partition').previousElementSibling;
+                const sourcePartitionDateLabel = container.querySelector('.source-partition-date').previousElementSibling;
+                
+                sourceTypeLabel.textContent = 'Source Type';
+                sourceLocationLabel.textContent = 'Source Location';
+                sourcePartitionLabel.textContent = 'Partition Column (optional)';
+                sourcePartitionDateLabel.textContent = 'Partition Date (optional)';
+                
+                // Reset source processor
+                sourceProcessorCheckbox.checked = false;
+                sourceProcessorSection.style.display = 'none';
+                sourceProcessorCheckbox.disabled = false;
+                
+                // Clear the second source configuration fields when disabled
+                container.querySelector('.source-type-2').value = '';
+                container.querySelector('.source-location-2').value = '';
+                container.querySelector('.source-partition-2').value = '';
+                container.querySelector('.source-partition-date-2').value = '';
+                container.querySelector('.copybook-location-2').value = '';
+                container.querySelector('.supporting-file-2').value = '';
+                container.querySelector('.file-type-specific-2').style.display = 'none';
+            }
+        }
+
+        function toggleAlertSection(checkbox) {
+            const container = checkbox.closest('.test-case-container');
+            const alertSection = container.querySelector('.alert-section');
+            const alertRulesSection = container.querySelector('.alert-rules-section');
+            
+            if (checkbox.checked) {
+                alertSection.style.display = 'block';
+                alertRulesSection.style.display = 'block';
+            } else {
+                alertSection.style.display = 'none';
+                alertRulesSection.style.display = 'none';
+            }
+        }
+
+        function addRule(button) {
+            const container = button.closest('.test-case-container');
+            const rulesContainer = container.querySelector('#rulesContainer');
+            
+            const ruleDiv = document.createElement('div');
+            ruleDiv.className = 'rule-item';
+            ruleDiv.innerHTML = `
+                <div class="row g-2 align-items-center">
+                    <div class="col-3">
+                        <input type="text" class="form-control rule-column" name="rule_column" required placeholder="Enter column name">
+                    </div>
+                    <div class="col-3">
+                        <select class="form-select rule-type" name="rule_type" onchange="handleValidationTypeChange(this)">
+                            <option value="">Select validation type</option>
+                            <option value="not_null">Not Null</option>
+                            <option value="null">Null</option>
+                            <option value="threshold">Threshold</option>
+                            <option value="regex">Regex</option>
+                            <option value="uniqueness">Uniqueness</option>
+                            <option value="pattern">Pattern</option>
+                        </select>
+                    </div>
+                    <div class="col-5">
+                        <div class="validation-params" style="display: none;">
+                            <!-- Threshold inputs -->
+                            <div class="threshold-params d-none">
+                                <div class="d-flex gap-2">
+                                    <input type="number" class="form-control threshold-min" name="threshold_min" placeholder="Min">
+                                    <input type="number" class="form-control threshold-max" name="threshold_max" placeholder="Max">
+                                </div>
+                            </div>
+                            <!-- Regex input -->
+                            <div class="regex-params d-none">
+                                <input type="text" class="form-control regex-pattern" name="regex_pattern" placeholder="Enter regex pattern">
+                            </div>
+                            <!-- Pattern input -->
+                            <div class="pattern-params d-none">
+                                <input type="text" class="form-control pattern-value" name="pattern_value" placeholder="Enter pattern (e.g., SIN########)">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-1 text-end">
+                        <button type="button" class="btn btn-outline-danger" onclick="removeRule(this)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            rulesContainer.appendChild(ruleDiv);
+            checkSectionCompletion(container);
+        }
+
+        function handleValidationTypeChange(select) {
+            const ruleItem = select.closest('.rule-item');
+            const validationParams = ruleItem.querySelector('.validation-params');
+            const thresholdParams = ruleItem.querySelector('.threshold-params');
+            const regexParams = ruleItem.querySelector('.regex-params');
+            const patternParams = ruleItem.querySelector('.pattern-params');
+            
+            // Hide all params first
+            validationParams.style.display = 'none';
+            thresholdParams.classList.add('d-none');
+            regexParams.classList.add('d-none');
+            patternParams.classList.add('d-none');
+            
+            // Show relevant params based on selection
+            switch (select.value) {
+                case 'threshold':
+                    validationParams.style.display = 'block';
+                    thresholdParams.classList.remove('d-none');
+                    break;
+                case 'regex':
+                    validationParams.style.display = 'block';
+                    regexParams.classList.remove('d-none');
+                    break;
+                case 'pattern':
+                    validationParams.style.display = 'block';
+                    patternParams.classList.remove('d-none');
+                    break;
+            }
+
+            const container = select.closest('.test-case-container');
+            checkSectionCompletion(container);
+        }
+
+        function removeRule(button) {
+            const container = button.closest('.test-case-container');
+            button.closest('.rule-item').remove();
+            checkSectionCompletion(container);
+        }
+
+        function addKeyColumn(button) {
+            const container = button.closest('.test-case-container');
+            const keyColumnsContainer = container.querySelector('#keyColumnsContainer');
+            
+            const columnDiv = document.createElement('div');
+            columnDiv.className = 'key-column-container';
+            columnDiv.innerHTML = `
+                <div class="row mb-3">
+                    <div class="col-md-10">
+                        <input type="text" class="form-control key-column" name="key_column" placeholder="Enter key column name (e.g., id, customer_id)">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-danger" onclick="removeKeyColumn(this)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            keyColumnsContainer.appendChild(columnDiv);
+        }
+
+        function removeKeyColumn(button) {
+            const container = button.closest('.key-column-container');
+            const allColumns = container.parentElement.querySelectorAll('.key-column-container');
+            
+            if (allColumns.length > 1) {
+                container.remove();
+            }
+        }
+
+        function addAlertRule(button) {
+            const container = button.closest('.test-case-container');
+            const alertRulesContainer = container.querySelector('#alertRulesContainer');
+            
+            const ruleDiv = document.createElement('div');
+            ruleDiv.className = 'alert-rule-item';
+            ruleDiv.innerHTML = `
+                <div class="row align-items-end">
+                    <div class="col-md-12">
+                        <label class="form-label">Column</label>
+                        <input type="text" class="form-control alert-rule-column" name="alert_rule_column" required placeholder="Enter column name for alert rule">
+                    </div>
+                    <div class="col-md-12">
+                        <input type="email" class="form-control alert-rule-notify" name="alert_rule_notify" required placeholder="Enter email address for this alert rule">
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-outline-danger" onclick="removeAlertRule(this)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            alertRulesContainer.appendChild(ruleDiv);
+        }
+
+        function removeAlertRule(button) {
+            button.closest('.alert-rule-item').remove();
+        }
+
+        function downloadAllYAML() {
+            const testCases = document.querySelectorAll('.test-case-container');
+            let hasErrors = false;
+            
+            // Get SID value
+            const sidInput = document.getElementById('username');
+            const sidValue = sidInput.value.trim();
+            if (!sidValue) {
+                alert('SID is required. Please enter your SID.');
+                sidInput.classList.add('is-invalid');
+                sidInput.setAttribute('title', 'This field is required');
+                return;
+            } else {
+                sidInput.classList.remove('is-invalid');
+                sidInput.removeAttribute('title');
+            }
+            
+            testCases.forEach(testCase => {
+                const testCaseName = testCase.querySelector('.test-case-name').value;
+                if (!testCaseName) {
+                    alert('Please enter a test case name for all test cases');
+                    hasErrors = true;
+                    return;
+                }
+
+                const yamlContent = generateYAML(testCase, sidValue);
+                if (yamlContent === null) {
+                    hasErrors = true;
+                    return;
+                }
+                downloadYAML(yamlContent, testCaseName);
+            });
+
+            if (!hasErrors) {
+                alert('All YAML files have been generated successfully!');
+            }
+        }
+
+        function generateYAML(testCase, sidValue) {
+            if (!validateForm(testCase)) {
+                alert('Please fix the validation errors before generating YAML');
+                return null;
+            }
+
+            const yaml = {
+                sid: sidValue,
+                test_case_name: testCase.querySelector('.test-case-name').value,
+                table_name: testCase.querySelector('.table-name').value,
+                run_type: testCase.querySelector('input[name="run_type"]:checked')?.value || 'dry',
+                generate_html_report: testCase.querySelector('.generate-html-report').checked || false,
+                source_configuration: {
+                    source_type: testCase.querySelector('.source-type').value,
+                    source_location: testCase.querySelector('.source-location').value
+                },
+                target_configuration: {
+                    target_type: testCase.querySelector('.target-type').value,
+                    target_location: testCase.querySelector('.target-location').value
+                }
+            };
+
+            // Add source partition details if specified
+            const sourcePartition = testCase.querySelector('.source-partition').value;
+            const sourcePartitionDate = testCase.querySelector('.source-partition-date').value;
+            if (sourcePartition) {
+                yaml.source_configuration.partition_column = sourcePartition;
+            }
+            if (sourcePartitionDate) {
+                yaml.source_configuration.partition_date = sourcePartitionDate;
+            }
+
+            // Add MultiSource configuration if enabled
+            const isMultiSourceEnabled = testCase.querySelector('.multi-source-enabled').checked;
+            if (isMultiSourceEnabled) {
+                yaml.source_configuration.multi_source = true;
+                yaml.source_configuration.source_2 = {
+                    source_type: testCase.querySelector('.source-type-2').value,
+                    source_location: testCase.querySelector('.source-location-2').value
+                };
+                
+                const sourcePartition2 = testCase.querySelector('.source-partition-2').value;
+                const sourcePartitionDate2 = testCase.querySelector('.source-partition-date-2').value;
+                if (sourcePartition2) {
+                    yaml.source_configuration.source_2.partition_column = sourcePartition2;
+                }
+                if (sourcePartitionDate2) {
+                    yaml.source_configuration.source_2.partition_date = sourcePartitionDate2;
+                }
+            }
+
+            // Add source processor if enabled
+            const sourceProcessorEnabled = testCase.querySelector('.source-processor-enabled').checked;
+            if (sourceProcessorEnabled) {
+                const processorCode = testCase.querySelector('.source-processor-code').value;
+                if (processorCode) {
+                    yaml.source_configuration.processor = {
+                        enabled: true,
+                        code_path: processorCode
+                    };
+                }
+            }
+
+            // Add schema definition if specified
+            const schemaDefinition = testCase.querySelector('.schema-definition').value;
+            if (schemaDefinition) {
+                yaml.schema_definition = schemaDefinition;
+            }
+
+            // Add target partition details if specified
+            const targetPartition = testCase.querySelector('.target-partition').value;
+            const targetPartitionDate = testCase.querySelector('.target-partition-date').value;
+            if (targetPartition) {
+                yaml.target_configuration.partition_column = targetPartition;
+            }
+            if (targetPartitionDate) {
+                yaml.target_configuration.partition_date = targetPartitionDate;
+            }
+
+            // Add column names if functional run is selected and names are specified
+            const runType = testCase.querySelector('input[name="run_type"]:checked')?.value;
+            const columnNames = testCase.querySelector('.column-names').value;
+            if (runType === 'functional' && columnNames) {
+                yaml.column_names = columnNames.split(',').map(name => name.trim()).filter(name => name);
+            }
+
+            // Add key columns
+            const keyColumns = Array.from(testCase.querySelectorAll('.key-column'))
+                .map(input => input.value.trim())
+                .filter(value => value);
+            if (keyColumns.length > 0) {
+                yaml.key_columns = keyColumns;
+            }
+
+            // Add validation types
+            const validationTypes = Array.from(testCase.querySelectorAll('.validation-type.individual-validation:checked'))
+                .map(checkbox => checkbox.value);
+            if (validationTypes.length > 0) {
+                yaml.validation_types = validationTypes;
+            }
+
+            // Add rules
+            const rules = [];
+            testCase.querySelectorAll('.rule-item').forEach(rule => {
+                const column = rule.querySelector('.rule-column').value;
+                const type = rule.querySelector('.rule-type').value;
+                if (!column || !type) return;
+
+                const ruleObj = {
+                    column: column,
+                    validation: {
+                        type: type
+                    }
+                };
+
+                switch (type) {
+                    case 'threshold':
+                        const min = rule.querySelector('.threshold-min').value;
+                        const max = rule.querySelector('.threshold-max').value;
+                        if (min) ruleObj.validation.min = Number(min);
+                        if (max) ruleObj.validation.max = Number(max);
+                        break;
+                    case 'regex':
+                        const regexPattern = rule.querySelector('.regex-pattern').value;
+                        if (regexPattern) ruleObj.validation.pattern = regexPattern;
+                        break;
+                    case 'pattern':
+                        const pattern = rule.querySelector('.pattern-value').value;
+                        if (pattern) ruleObj.validation.pattern = pattern;
+                        break;
+                }
+
+                rules.push(ruleObj);
+            });
+            if (rules.length > 0) {
+                yaml.rules = rules;
+            }
+
+            // Add execution notes if specified
+            const executionNotes = testCase.querySelector('.execution-notes').value;
+            if (executionNotes) {
+                yaml.execution_notes = executionNotes;
+            }
+
+            // Add JIRA information
+            yaml.jira = {
+                parent_ticket: testCase.querySelector('#parentTicket').value,
+                test_plan_ticket: testCase.querySelector('#testPlanTicket').value,
+                environment: testCase.querySelector('#environment').value,
+                release_name: testCase.querySelector('#releaseName').value
+            };
+
+            // Add scheduler information if enabled
+            const schedulerToggle = testCase.querySelector('#schedulerToggle');
+            if (schedulerToggle && schedulerToggle.checked) {
+                const frequency = testCase.querySelector('#schedulerFrequency').value;
+                yaml.scheduler = {
+                    enabled: "yes",
+                    frequency: frequency
+                };
+                
+                // Add day of week for weekly frequency
+                if (frequency === 'weekly') {
+                    yaml.scheduler.day_of_week = testCase.querySelector('#schedulerWeekDay').value;
+                }
+                
+                // Add day of month for monthly frequency
+                if (frequency === 'monthly') {
+                    yaml.scheduler.day_of_month = testCase.querySelector('#schedulerMonthDay').value;
+                }
+                
+                // Use SID as username
+                yaml.scheduler.username = sidValue;
+            }
+
+            return jsyaml.dump(yaml);
+        }
+
+        function downloadYAML(content, filename) {
+            const blob = new Blob([content], { type: 'application/yaml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${filename}.yaml`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function validateForm(testCase) {
+            const requiredFields = testCase.querySelectorAll('[required]');
+            let isValid = true;
+            
+            // Reset all section highlights
+            testCase.querySelectorAll('.form-section').forEach(section => {
+                section.classList.remove('has-error');
+            });
+
+            // Check if MultiSource is enabled
+            const isMultiSourceEnabled = testCase.querySelector('.multi-source-enabled').checked;
+            
+            // Validate source processor when MultiSource is enabled
+            if (isMultiSourceEnabled) {
+                const sourceProcessorEnabled = testCase.querySelector('.source-processor-enabled');
+                const sourceProcessorCode = testCase.querySelector('.source-processor-code');
+                const processorSection = sourceProcessorEnabled.closest('.form-section');
+                
+                if (!sourceProcessorEnabled.checked || !sourceProcessorCode.value) {
+                    processorSection.classList.add('has-error');
+                    sourceProcessorCode.classList.add('is-invalid');
+                    sourceProcessorCode.setAttribute('title', 'Source processor is required when MultiSource is enabled');
+                    isValid = false;
+                } else {
+                    sourceProcessorCode.classList.remove('is-invalid');
+                    sourceProcessorCode.removeAttribute('title');
+                }
+            }
+            
+            requiredFields.forEach(field => {
+                // Skip Source-2 validation if MultiSource is disabled
+                if (!isMultiSourceEnabled && (field.classList.contains('source-type-2') || 
+                    field.classList.contains('source-location-2') ||
+                    field.closest('.source-config-2'))) {
+                    return;
+                }
+
+                if (!field.value) {
+                    const section = field.closest('.form-section');
+                    section.classList.add('has-error');
+                    field.classList.add('is-invalid');
+                    field.setAttribute('title', 'This field is required');
+                    isValid = false;
+                } else {
+                    field.classList.remove('is-invalid');
+                    field.removeAttribute('title');
+                }
+            });
+            
+            // Validate email format
+            const emailFields = testCase.querySelectorAll('input[type="email"]');
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            emailFields.forEach(field => {
+                if (field.value && !emailRegex.test(field.value)) {
+                    const section = field.closest('.form-section');
+                    section.classList.add('has-error');
+                    field.classList.add('is-invalid');
+                    field.setAttribute('title', 'Please enter a valid email address');
+                    isValid = false;
+                } else if (field.value) {
+                    field.classList.remove('is-invalid');
+                    field.removeAttribute('title');
+                }
+            });
+            
+            // Validate JIRA ticket format
+            const jiraNumber = testCase.querySelector('#parentTicket');
+            const jiraRegex = /^[A-Z]+-\d+$/;
+            if (jiraNumber.value && !jiraRegex.test(jiraNumber.value)) {
+                const section = jiraNumber.closest('.form-section');
+                section.classList.add('has-error');
+                jiraNumber.classList.add('is-invalid');
+                jiraNumber.setAttribute('title', 'JIRA ticket should be in format: ABC-123');
+                isValid = false;
+            } else if (jiraNumber.value) {
+                jiraNumber.classList.remove('is-invalid');
+                jiraNumber.removeAttribute('title');
+            }
+
+            // Validate source and target types
+            const sourceType = testCase.querySelector('.source-type');
+            const targetType = testCase.querySelector('.target-type');
+            const tableName = testCase.querySelector('.table-name');
+            
+            if (!sourceType.value) {
+                const section = sourceType.closest('.form-section');
+                section.classList.add('has-error');
+                sourceType.classList.add('is-invalid');
+                sourceType.setAttribute('title', 'Please select a source type');
+                isValid = false;
+            } else {
+                sourceType.classList.remove('is-invalid');
+                sourceType.removeAttribute('title');
+            }
+
+            if (!targetType.value) {
+                const section = targetType.closest('.form-section');
+                section.classList.add('has-error');
+                targetType.classList.add('is-invalid');
+                targetType.setAttribute('title', 'Please select a target type');
+                isValid = false;
+            } else {
+                targetType.classList.remove('is-invalid');
+                targetType.removeAttribute('title');
+            }
+
+            // Validate table name
+            if (!tableName.value) {
+                const section = tableName.closest('.form-section');
+                section.classList.add('has-error');
+                tableName.classList.add('is-invalid');
+                tableName.setAttribute('title', 'Please enter a table name');
+                isValid = false;
+            } else {
+                tableName.classList.remove('is-invalid');
+                tableName.removeAttribute('title');
+            }
+
+            // If there are errors, scroll to the first error
+            if (!isValid) {
+                const firstError = testCase.querySelector('.has-error');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+            
+            return isValid;
+        }
+
+        // Function to handle ALL validation type
+        function handleAllValidation(checkbox) {
+            const container = checkbox.closest('.test-case-container');
+            const individualCheckboxes = container.querySelectorAll('.individual-validation');
+            const validationTypesSection = container.querySelector('.validation-type').closest('.form-section');
+            
+            individualCheckboxes.forEach(individualCheckbox => {
+                individualCheckbox.checked = checkbox.checked;
+            });
+
+            // Update the green bar state
+            validationTypesSection.classList.toggle('completed', checkbox.checked);
+        }
+
+        // Function to handle individual validation changes
+        function handleIndividualValidation(checkbox) {
+            const container = checkbox.closest('.test-case-container');
+            const allCheckbox = container.querySelector('#allValidation');
+            const individualCheckboxes = container.querySelectorAll('.individual-validation');
+            const validationTypesSection = container.querySelector('.validation-type').closest('.form-section');
+            
+            // Check if all individual checkboxes are checked
+            const allChecked = Array.from(individualCheckboxes).every(cb => cb.checked);
+            allCheckbox.checked = allChecked;
+
+            // Update the green bar state
+            validationTypesSection.classList.toggle('completed', allChecked || Array.from(individualCheckboxes).some(cb => cb.checked));
+        }
+
+        function toggleSourceProcessor(checkbox) {
+            const container = checkbox.closest('.test-case-container');
+            const processorSection = container.querySelector('.source-processor-section');
+            
+            if (checkbox.checked) {
+                processorSection.style.display = 'block';
+            } else {
+                processorSection.style.display = 'none';
+            }
+        }
+
+        // Add event listeners to validation type checkboxes
+        document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('change', function(event) {
+                if (event.target.matches('.validation-type')) {
+                    if (event.target.value === 'all') {
+                        handleAllValidation(event.target);
+                    } else {
+                        handleIndividualValidation(event.target);
+                    }
+                }
+            });
+            
+            // Add listener to handle scheduler toggle for each test case container
+            document.addEventListener('change', function(event) {
+                if (event.target.matches('#schedulerToggle')) {
+                    const container = event.target.closest('.test-case-container');
+                    const schedulerSettings = container.querySelector('#schedulerSettings');
+                    if (event.target.checked) {
+                        schedulerSettings.style.display = 'flex';
+                    } else {
+                        schedulerSettings.style.display = 'none';
+                    }
+                    checkSectionCompletion(container);
+                }
+            });
+        });
+
+        // Function to get selected validation types
+        function getSelectedValidationTypes(testCase) {
+            const validationTypes = [];
+            const checkboxes = testCase.querySelectorAll('.individual-validation:checked');
+            checkboxes.forEach(checkbox => {
+                validationTypes.push(checkbox.value);
+            });
+            return validationTypes;
+        }
+
+        // Add Save/Load functionality
+        function saveToLocal() {
+            const testCasesContainer = document.getElementById('testCasesContainer');
+            localStorage.setItem('savedTestCases', testCasesContainer.innerHTML);
+            alert('Test cases saved successfully!');
+        }
+
+        function loadFromLocal() {
+            const savedTestCases = localStorage.getItem('savedTestCases');
+            if (savedTestCases) {
+                if (confirm('Loading saved test cases will replace current ones. Continue?')) {
+                    const testCasesContainer = document.getElementById('testCasesContainer');
+                    testCasesContainer.innerHTML = savedTestCases;
+                    alert('Test cases loaded successfully!');
+                }
+            } else {
+                alert('No saved test cases found!');
+            }
+        }
+
+        // Add first test case on page load
+        window.onload = function() {
+            addNewTestCase();
+        };
+
+        function resetTestCase(event, button) {
+            event.stopPropagation(); // Prevent the click from triggering the toggle
+            const container = button.closest('.test-case-container');
+            
+            // Reset all input fields
+            container.querySelectorAll('input[type="text"], input[type="email"], input[type="number"]').forEach(input => {
+                input.value = '';
+                input.classList.remove('is-invalid');
+            });
+            
+            // Reset all select fields
+            container.querySelectorAll('select').forEach(select => {
+                select.value = '';
+                select.classList.remove('is-invalid');
+            });
+            
+            // Reset all checkboxes
+            container.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            // Reset textareas
+            container.querySelectorAll('textarea').forEach(textarea => {
+                textarea.value = '';
+            });
+            
+            // Reset key columns to one empty field
+            const keyColumnsContainer = container.querySelector('#keyColumnsContainer');
+            keyColumnsContainer.innerHTML = `
+                <div class="key-column-container">
+                    <div class="row mb-3">
+                        <div class="col-md-10">
+                            <input type="text" class="form-control key-column" name="key_column" placeholder="Enter key column name (e.g., id, customer_id)">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-outline-danger" onclick="removeKeyColumn(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Reset rules container
+            const rulesContainer = container.querySelector('#rulesContainer');
+            rulesContainer.innerHTML = '';
+            
+            // Hide any special sections
+            container.querySelectorAll('.file-type-specific, .target-type-specific, .source-processor-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Reset location labels
+            container.querySelector('.source-location-label').textContent = 'Source Location';
+            container.querySelector('.target-location-label').textContent = 'Target Location';
+
+            // Reset completion status for all sections
+            container.querySelectorAll('.form-section').forEach(section => {
+                section.classList.remove('completed');
+            });
+
+            // Update test case name display
+            const nameDisplay = container.querySelector('.test-case-name-display');
+            nameDisplay.textContent = '';
+        }
+
+        function checkSectionCompletion(container) {
+            // Check Test Case Name section
+            const testCaseSection = container.querySelector('.test-case-name').closest('.form-section');
+            const testCaseName = container.querySelector('.test-case-name').value;
+            testCaseSection.classList.toggle('completed', testCaseName.length > 0);
+            
+            // Check Scheduler section
+            const schedulerSection = container.querySelector('#schedulerToggle').closest('.form-section');
+            const schedulerEnabled = container.querySelector('#schedulerToggle').checked;
+            if (schedulerEnabled) {
+                const frequency = container.querySelector('#schedulerFrequency').value;
+                let schedulerComplete = true;
+                
+                // Check for required fields based on frequency
+                if (frequency === 'weekly') {
+                    schedulerComplete = container.querySelector('#schedulerWeekDay').value !== '';
+                } else if (frequency === 'monthly') {
+                    schedulerComplete = container.querySelector('#schedulerMonthDay').value !== '';
+                }
+                
+                schedulerSection.classList.toggle('completed', schedulerComplete);
+            } else {
+                // If scheduler is not enabled, mark as completed since it's optional
+                schedulerSection.classList.add('completed');
+            }
+
+            // Check Table Name section
+            const tableNameSection = container.querySelector('.table-name').closest('.form-section');
+            const tableName = container.querySelector('.table-name').value;
+            tableNameSection.classList.toggle('completed', tableName.length > 0);
+
+            // Check Run Type Configuration section
+            const runTypeSection = container.querySelector('input[name="run_type"]').closest('.form-section');
+            const runTypeSelected = container.querySelector('input[name="run_type"]:checked');
+            runTypeSection.classList.toggle('completed', runTypeSelected !== null);
+
+            // Check Source Configuration section
+            const sourceSection = container.querySelector('.source-type').closest('.form-section');
+            const sourceType = container.querySelector('.source-type').value;
+            const sourceLocation = container.querySelector('.source-location').value;
+            sourceSection.classList.toggle('completed', sourceType && sourceLocation);
+
+            // Check Source Processor section
+            const processorSection = container.querySelector('.source-processor-enabled')?.closest('.form-section');
+            if (processorSection) {
+                const processorEnabled = container.querySelector('.source-processor-enabled').checked;
+                if (!processorEnabled) {
+                    processorSection.classList.remove('completed');
+                } else {
+                    const processorCode = container.querySelector('.source-processor-code').value;
+                    processorSection.classList.toggle('completed', processorCode.length > 0);
+                }
+            }
+
+            // Check Target Configuration section
+            const targetSection = container.querySelector('.target-type').closest('.form-section');
+            const targetType = container.querySelector('.target-type').value;
+            const targetLocation = container.querySelector('.target-location').value;
+            targetSection.classList.toggle('completed', targetType && targetLocation);
+
+            // Check Key Columns section
+            const keyColumnsSection = container.querySelector('#keyColumnsContainer').closest('.form-section');
+            const keyColumns = container.querySelectorAll('.key-column');
+            const hasValidKeyColumn = Array.from(keyColumns).some(input => input.value.length > 0);
+            keyColumnsSection.classList.toggle('completed', hasValidKeyColumn);
+
+            // Check Validation Types section
+            const validationTypesSection = container.querySelector('.validation-type').closest('.form-section');
+            const allValidation = container.querySelector('#allValidation').checked;
+            const individualValidations = container.querySelectorAll('.individual-validation:checked');
+            validationTypesSection.classList.toggle('completed', allValidation || individualValidations.length > 0);
+
+            // Check Rules section
+            const rulesSection = container.querySelector('#rulesContainer').closest('.form-section');
+            const rules = container.querySelectorAll('.rule-item');
+            const hasRules = rules.length > 0;
+            const rulesValid = Array.from(rules).every(rule => {
+                const column = rule.querySelector('.rule-column').value;
+                const type = rule.querySelector('.rule-type').value;
+                if (!column || !type) return false;
+                
+                switch (type) {
+                    case 'threshold':
+                        const min = rule.querySelector('.threshold-min').value;
+                        const max = rule.querySelector('.threshold-max').value;
+                        return min || max;
+                    case 'regex':
+                        return rule.querySelector('.regex-pattern').value.length > 0;
+                    case 'pattern':
+                        return rule.querySelector('.pattern-value').value.length > 0;
+                    default:
+                        return true;
+                }
+            });
+            rulesSection.classList.toggle('completed', hasRules && rulesValid);
+
+            // Check Execution Notes section
+            const notesSection = container.querySelector('.execution-notes').closest('.form-section');
+            const notes = container.querySelector('.execution-notes').value;
+            notesSection.classList.toggle('completed', notes.length > 0);
+
+            // Check Jira Information section
+            const jiraSection = container.querySelector('#parentTicket').closest('.form-section');
+            const jiraNumber = container.querySelector('#parentTicket').value;
+            const testPlanJira = container.querySelector('#testPlanTicket').value;
+            const environment = container.querySelector('#environment').value;
+            const releaseName = container.querySelector('#releaseName').value;
+            jiraSection.classList.toggle('completed', jiraNumber && testPlanJira && environment && releaseName);
+            
+            // Check HTML Report Toggle section - always mark as completed since it's optional
+            const htmlReportSection = container.querySelector('.generate-html-report').closest('.form-section');
+            htmlReportSection.classList.add('completed');
+        }
+
+        // Add event listeners for input changes
+        function addSectionCompletionListeners(container) {
+            const inputs = container.querySelectorAll('input, select, textarea');
+            inputs.forEach(input => {
+                input.addEventListener('change', () => checkSectionCompletion(container));
+                input.addEventListener('input', () => checkSectionCompletion(container));
+            });
+        }
+
+        // Modify the addNewTestCase function to add completion listeners
+        const originalAddNewTestCase = window.addNewTestCase;
+        window.addNewTestCase = function() {
+            originalAddNewTestCase();
+            const container = document.querySelector('.test-case-container:last-child');
+            addSectionCompletionListeners(container);
+        };
+
+        // Add listeners to existing test cases on page load
+        window.addEventListener('load', function() {
+            document.querySelectorAll('.test-case-container').forEach(container => {
+                addSectionCompletionListeners(container);
+            });
+        });
+
+        // Add style for validation params
+        const style = document.createElement('style');
+        style.textContent = `
+            .validation-params {
+                display: flex;
+                gap: 8px;
+            }
+            .validation-params input {
+                flex: 1;
+            }
+            .threshold-params {
+                display: flex;
+                gap: 8px;
+                width: 100%;
+            }
+            .regex-params, .pattern-params {
+                width: 100%;
+            }
+            .form-section {
+                transition: border-left-color 0.3s ease;
+            }
+            .rule-item {
+                background-color: white;
+                padding: 12px;
+                border-radius: 5px;
+                margin-bottom: 10px;
+            }
+            .rule-item .row {
+                margin: 0;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Add event listener for source processor
+        document.addEventListener('change', function(event) {
+            if (event.target.matches('.source-processor-enabled, .source-processor-code')) {
+                const container = event.target.closest('.test-case-container');
+                checkSectionCompletion(container);
+            }
+        });
+
+        function handleRunTypeChange(radio) {
+            const container = radio.closest('.test-case-container');
+            const columnNamesSection = container.querySelector('.column-names-section');
+            
+            if (radio.value === 'functional') {
+                columnNamesSection.style.display = 'block';
+            } else {
+                columnNamesSection.style.display = 'none';
+                // Clear column names when switching away from functional run
+                container.querySelector('.column-names').value = '';
+            }
+        }
+
+        // Handle frequency change in scheduler
+        function handleFrequencyChange(select) {
+            const container = select.closest('.test-case-container');
+            const weeklyOptions = container.querySelector('#weeklyOptions');
+            const monthlyOptions = container.querySelector('#monthlyOptions');
+            
+            // Hide all extra options first
+            weeklyOptions.style.display = 'none';
+            monthlyOptions.style.display = 'none';
+            
+            // Show relevant options based on selection
+            if (select.value === 'weekly') {
+                weeklyOptions.style.display = 'block';
+            } else if (select.value === 'monthly') {
+                monthlyOptions.style.display = 'block';
+            }
+            
+            // Update completion status
+            checkSectionCompletion(container);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Custom Episodic to CSV Converter Configuration
+
+plugins:
+  - name: episodic_to_csv_converter.py
+    function: run
+    params:
+      input_path: "/path/to/input/custom_episodes.txt"
+      output_path: "/path/to/output/episodes.csv"
+      header: true
+      delimiter: ","  # Output CSV delimiter
+      file_format: "custom"  # Using custom format
+      flatten: true  # Flatten hierarchical data
+      episode_identifier: "episode_id"
+      custom_parser_config:
+        parser_type: "line_based"
+        line_separator: "|"
+        fields:
+          - "episode_id"
+          - "patient_id"
+          - "admission_date"
+          - "discharge_date"
+          - "diagnosis_code"
+          - "treatment_code"
+      append_mode: false 

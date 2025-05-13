@@ -1,0 +1,9 @@
+python3 add_to_scheduler.py Testcases/TC_003.yaml
+python3 run_scheduler.py --run-now 
+python3 run_test_cases.py
+python3 run_tests_visual.py
+
+python3 version_info.py --detailed
+python3 version_info.py --banner
+
+python3 run_tests_visual.py --test-file Testcases/TC_004.yaml --debug

@@ -1,0 +1,34 @@
+# Mainframe to CSV Converter Configuration
+
+plugins:
+  - name: mainframe_to_csv_converter.py
+    function: run
+    params:
+      input_path: "/path/to/input/mainframe_data.txt"
+      output_path: "/path/to/output/data.csv"
+      header: true
+      delimiter: ","  # Output CSV delimiter
+      file_type: "fixed-width"  # Options: "fixed-width" or "ebcdic"
+      field_definitions:
+        - name: "EMPLOYEE_ID"
+          start: 0
+          length: 6
+          type: "string"
+        - name: "FIRST_NAME"
+          start: 6
+          length: 15
+          type: "string"
+        - name: "LAST_NAME"
+          start: 21
+          length: 20
+          type: "string"
+        - name: "SALARY"
+          start: 41
+          length: 10
+          type: "double"
+        - name: "HIRE_DATE"
+          start: 51
+          length: 10
+          type: "date"
+      codepage: 1047  # EBCDIC codepage (if using EBCDIC)
+      append_mode: false 

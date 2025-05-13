@@ -1,0 +1,10 @@
+Test results saved to:
+- Summary: test_results/summary_20250509_134728.txt
+- HTML Summary: test_results/summary_20250509_134728.html
+- Detailed results: test_results/framework_tests_20250509_134728.txt
+
+To view the summary:
+cat test_results/summary_20250509_134728.txt
+
+To open the HTML summary in a browser:
+open test_results/summary_20250509_134728.html

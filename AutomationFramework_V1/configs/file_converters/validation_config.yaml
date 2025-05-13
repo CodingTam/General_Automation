@@ -1,0 +1,49 @@
+# Comprehensive Data Validation Configuration
+
+# Plugin configuration file path (can be inline or a separate file)
+plugin_config: "sample_plugin_config.yaml"
+
+# Validation configuration
+validation:
+  # Key columns for data matching (if null, will try to auto-detect)
+  key_columns: ["id"]
+  
+  # Types of validation to perform
+  validation_types:
+    - Schema
+    - Count
+    - Data
+    - Null
+    - Duplicate
+  
+  # Data quality rules
+  rules:
+    not_null:
+      - id
+      - name
+      - amount
+    
+    uniqueness:
+      - id
+    
+    regex:
+      name: "[A-Za-z]+"
+    
+    threshold:
+      amount:
+        min: 0
+        max: 10000
+    
+    # Advanced rule with conditional check
+    custom:
+      - column: amount
+        condition: "> 0"
+        description: "Amount must be positive"
+  
+  # Output configuration
+  report_output_path: "validation_report.yaml"
+  report_format: "yaml"  # options: yaml, json, html
+  
+  # Execution settings
+  fail_on_error: false
+  log_level: "INFO" 

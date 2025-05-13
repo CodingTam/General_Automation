@@ -1,0 +1,124 @@
+formats:
+  csv:
+    current_version: 1.1.2
+    current_version_type: beta
+    stable_version: 1.1.1
+    available_versions:
+      - version: 1.1.1
+        type: stable
+        release_date: "2023-12-01"
+      - version: 1.1.2
+        type: beta
+        release_date: "2024-01-15"
+  psv:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  xml:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  ebcdic:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  mainframe:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  json:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  parquet:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  avro:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  fixedlength:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  fixedwidth:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  bigquery:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  hql:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  hive:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  binary:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01"
+  episodic:
+    current_version: 1.0.0
+    current_version_type: stable
+    stable_version: 1.0.0
+    available_versions:
+      - version: 1.0.0
+        type: stable
+        release_date: "2023-11-01" 

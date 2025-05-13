@@ -1,0 +1,7 @@
+# Framework-level configuration
+
+# Database Configuration
+database:
+  path: "/Users/tamilarasanrajendran/Documents/01.Projects/SQLITE/DATABASES/automation.db"
+  timeout: 60.0  # Database connection timeout in seconds
+  max_retries: 5  # Maximum number of connection retries 

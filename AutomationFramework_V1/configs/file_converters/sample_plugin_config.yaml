@@ -1,0 +1,69 @@
+# Sample Plugin Configuration for Data Validation Framework
+
+plugins:
+  # First plugin: Data Type Converter to ensure type compatibility
+  - name: data_type_converter.py
+    function: run
+    params:
+      auto_detect: true  # Automatically match target column types to source
+      column_type_mappings:
+        id: int
+        amount: double
+        date: date
+      date_format: "yyyy-MM-dd"
+
+  # Second plugin: Column Renamer for source DataFrame
+  - name: column_renamer.py
+    function: run
+    params:
+      transform_target: source  # Apply to source DataFrame only
+      columns_map:
+        old_column_name: new_column_name
+        legacy_id: customer_id
+        timestamp: event_date
+
+  # Third plugin: Column Renamer for target DataFrame
+  - name: column_renamer.py
+    function: run
+    params:
+      transform_target: target  # Apply to target DataFrame only
+      columns_map:
+        customer_identifier: customer_id
+        event_timestamp: event_date
+
+  # Fourth plugin: Data Filter for source DataFrame
+  - name: data_filter.py
+    function: run
+    params:
+      transform_target: source
+      filter_conditions:
+        - column: customer_id
+          operator: "!="
+          value: null
+        - column: event_date
+          operator: ">"
+          value: "2023-01-01"
+      join_type: and  # Must satisfy all conditions
+
+  # Fifth plugin: Data Filter for target DataFrame
+  - name: data_filter.py
+    function: run
+    params:
+      transform_target: target
+      filter_conditions:
+        - column: customer_id
+          operator: "!="
+          value: null
+        - column: status
+          operator: "in"
+          value: ["active", "pending"]
+      join_type: and  # Must satisfy all conditions
+
+# Example of adding a custom plugin
+  # - name: custom_aggregator.py
+  #   function: run
+  #   params:
+  #     transform_target: both
+  #     aggregation_column: revenue
+  #     aggregation_function: sum
+  #     group_by_columns: ["customer_id", "product_id"] 

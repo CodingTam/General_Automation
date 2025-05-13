@@ -1,0 +1,133 @@
+/* App.css */
+
+/* Import TailwindCSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* SplitPane styles */
+.Resizer {
+  background: #ccc;
+  z-index: 1;
+  box-sizing: border-box;
+  background-clip: padding-box;
+}
+
+.Resizer.horizontal {
+  height: 11px;
+  margin: -5px 0;
+  border-top: 5px solid rgba(255, 255, 255, 0);
+  border-bottom: 5px solid rgba(255, 255, 255, 0);
+  cursor: row-resize;
+  width: 100%;
+}
+
+.Resizer.horizontal:hover {
+  border-top: 5px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 5px solid rgba(0, 0, 0, 0.1);
+}
+
+.Resizer.vertical {
+  width: 11px;
+  margin: 0 -5px;
+  border-left: 5px solid rgba(255, 255, 255, 0);
+  border-right: 5px solid rgba(255, 255, 255, 0);
+  cursor: col-resize;
+}
+
+.Resizer.vertical:hover {
+  border-left: 5px solid rgba(0, 0, 0, 0.1);
+  border-right: 5px solid rgba(0, 0, 0, 0.1);
+}
+
+.Resizer.disabled {
+  cursor: not-allowed;
+}
+
+.Resizer.disabled:hover {
+  border-color: transparent;
+}
+
+/* Table styles */
+.diff-table th,
+.diff-table td {
+  @apply px-4 py-2 border text-sm;
+}
+
+.diff-table th {
+  @apply bg-gray-100 font-semibold text-left;
+}
+
+.diff-table tr:nth-child(odd) {
+  @apply bg-white;
+}
+
+.diff-table tr:nth-child(even) {
+  @apply bg-gray-50;
+}
+
+/* Highlight differences */
+.cell-different {
+  @apply bg-red-100 text-red-800;
+}
+
+.row-missing-source {
+  @apply bg-red-50;
+}
+
+.row-missing-target {
+  @apply bg-orange-50;
+}
+
+/* MultiSelect styles */
+.multi-select {
+  @apply bg-white border border-gray-300 rounded-md px-3 py-2 text-sm;
+}
+
+.multi-select-menu {
+  @apply absolute mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm z-10;
+}
+
+.multi-select-option {
+  @apply cursor-pointer select-none relative py-2 pl-10 pr-4;
+}
+
+.multi-select-option[data-selected="true"] {
+  @apply bg-blue-100;
+}
+
+/* Button styles */
+.btn {
+  @apply px-4 py-2 rounded-md font-medium transition-colors duration-200;
+}
+
+.btn-primary {
+  @apply bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-50;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50;
+}
+
+.btn-danger {
+  @apply bg-red-500 text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50;
+}
+
+/* Scrollbar styles for better UX */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+} 

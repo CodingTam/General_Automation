@@ -1,0 +1,13 @@
+# XML to PSV Converter Configuration
+
+plugins:
+  - name: xml_to_csv_converter.py
+    function: run
+    params:
+      input_path: "/path/to/input/data.xml"
+      output_path: "/path/to/output/data.psv"
+      header: true
+      delimiter: "|"  # Use "|" for PSV format
+      row_tag: "record"  # XML tag that defines each record/row
+      schema_path: "/path/to/schema.json"  # Optional schema file
+      append_mode: false 

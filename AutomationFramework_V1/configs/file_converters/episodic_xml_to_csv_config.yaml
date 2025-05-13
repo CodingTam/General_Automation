@@ -1,0 +1,15 @@
+# Episodic XML to CSV Converter Configuration
+
+plugins:
+  - name: episodic_to_csv_converter.py
+    function: run
+    params:
+      input_path: "/path/to/input/episodes.xml"
+      output_path: "/path/to/output/episodes.csv"
+      header: true
+      delimiter: ","  # Output CSV delimiter
+      file_format: "xml"  # Using XML format
+      root_element: "episode"  # XML tag for each episode
+      flatten: true  # Flatten hierarchical data
+      episode_identifier: "id"  # Field that uniquely identifies episodes
+      append_mode: false 

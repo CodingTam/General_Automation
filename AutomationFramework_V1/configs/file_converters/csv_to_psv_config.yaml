@@ -1,0 +1,11 @@
+# CSV to PSV Converter Configuration
+
+plugins:
+  - name: csv_to_psv_converter.py
+    function: run
+    params:
+      input_path: "/path/to/input/file.csv"
+      output_path: "/path/to/output/file.psv"
+      header: true
+      delimiter: ","  # Input CSV delimiter
+      append_mode: false 

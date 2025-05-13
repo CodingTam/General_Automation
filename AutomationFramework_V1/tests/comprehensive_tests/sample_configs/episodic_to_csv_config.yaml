@@ -1,0 +1,30 @@
+input_path: /Users/tamilarasanrajendran/Documents/01.Projects/My_Python_Projects/AutomationFramework_V1/tests/comprehensive_tests/converters/../sample_files/sample.epi
+options:
+  delimiter: '|'
+  encoding: utf-8
+  record_types:
+    DIAGNOSIS:
+    - diagnosis_id
+    - episode_id
+    - code
+    - description
+    - type
+    EPISODE:
+    - episode_id
+    - patient_id
+    - start_date
+    - end_date
+    - type
+    MEDICATION:
+    - medication_id
+    - episode_id
+    - name
+    - dose
+    - unit
+    - status
+    PATIENT:
+    - patient_id
+    - name
+    - birth_date
+    - gender
+output_path: /var/folders/f_/6hw5fb_57mv2x30ljf05c5lm0000gn/T/tmpj31_lav2/yaml_output_episodic
