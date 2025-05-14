@@ -14,6 +14,15 @@ from logger import logger
 from utils.common import ensure_directory_exists
 from utils.banner import print_intro
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import argparse
+import json
+import traceback
+import subprocess
+import glob
+from pathlib import Path
+
 def get_test_files():
     """Get all Python files in the tests directory."""
     test_dir = "tests"

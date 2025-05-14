@@ -18,4 +18,9 @@ This package contains utility modules for the data validation framework:
 - Database handling
 - YAML processing
 - General utilities
+"""
+
+"""
+Utils package initialization file.
+This file makes the utils directory a proper Python package.
 """ 

@@ -10,6 +10,12 @@ import logging
 from utils.db_handler import DBHandler
 from utils.logger import logger, _logger, console_handler
 from utils.banner import print_intro
+import sys
+import json
+import time
+import traceback
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 def set_logging_mode(silent=False, quiet=False):
     """
