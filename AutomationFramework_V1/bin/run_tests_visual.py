@@ -32,6 +32,7 @@ NC = '\033[0m'  # No Color
 STAGES = [
     "Initialization",
     "Loading Configuration",
+    "Spark Submit",  # New stage for spark-submit
     "Schema Validation",
     "Data Loading",
     "Count Validation",
@@ -39,7 +40,7 @@ STAGES = [
     "Rule Validation",
     "Report Generation",
     "Results Storage",
-    "Jira Update"  # Added new Jira stage
+    "Jira Update"
 ]
 
 def clear_screen():
@@ -305,21 +306,23 @@ def execute_test_case(test_file, execution_run_id=None):
         ["initializing", "starting", "beginning", "test case", "execution start"],
         # Loading Configuration - Stage 1
         ["loading yaml", "loading config", "config loaded", "reading yaml", "processing config", "parsing yaml"],
-        # Schema Validation - Stage 2
+        # Spark Submit - Stage 2
+        ["spark-submit", "submitting spark job", "spark job submitted", "spark application", "spark context", "spark session"],
+        # Schema Validation - Stage 3
         ["schema validation", "validating schema", "schema check", "table schema", "schema comparison"],
-        # Data Loading - Stage 3
+        # Data Loading - Stage 4
         ["loading data", "data load", "reading data", "dataframe created", "loading table", "table loaded"],
-        # Count Validation - Stage 4
+        # Count Validation - Stage 5
         ["count validation", "row count", "record count", "count check", "comparing counts", "count match"],
-        # Data Comparison - Stage 5
+        # Data Comparison - Stage 6
         ["data comparison", "comparing data", "row comparison", "column compare", "value mismatch", "comparing values"],
-        # Rule Validation - Stage 6
+        # Rule Validation - Stage 7
         ["rule validation", "validating rules", "business rule", "rule check", "applying rules", "rule engine"],
-        # Report Generation - Stage 7
+        # Report Generation - Stage 8
         ["report generation", "generating report", "creating report", "report created", "building report"],
-        # Results Storage - Stage 8
+        # Results Storage - Stage 9
         ["storing results", "save result", "database insert", "writing results", "persisting results"],
-        # Jira Update - Stage 9
+        # Jira Update - Stage 10
         ["jira update", "updating jira", "ticket update", "issue link", "ticket created"]
     ]
     
@@ -371,7 +374,7 @@ def execute_test_case(test_file, execution_run_id=None):
     
     # Stage timeouts and progress tracking
     stage_start_times = [time.time()] * len(STAGES)
-    stage_timeouts = [3, 3, 3, 4, 4, 4, 4, 3, 3, 3]  # Timeouts for each stage in seconds
+    stage_timeouts = [3, 3, 4, 3, 4, 4, 4, 4, 3, 3, 3]  # Updated timeouts for each stage in seconds
     forced_stage_progression = False  # Flag to track if we're forcing stages due to lack of logs
     
     # Force stage progression when needed
@@ -457,12 +460,8 @@ def execute_test_case(test_file, execution_run_id=None):
             # Track the actual test result from each line
             for pattern in failure_patterns:
                 if pattern in line.lower():
-                    # Special case for TC_004 - always mark as PASSED
-                    if "TC_004" in test_file:
-                        test_result = "PASSED"
-                    else:
-                        test_result = "FAILED"
-                        validation_errors_detected = True
+                    test_result = "FAILED"
+                    validation_errors_detected = True
                     if DEBUG:
                         print(f"\n{RED}DEBUG: Test FAILED detected in logs: '{pattern}'{NC}")
                     break
@@ -565,9 +564,7 @@ def execute_test_case(test_file, execution_run_id=None):
         
         # Final analysis of full output for test result determination
         # First, check if any validation errors were detected during execution
-        if "TC_004" in test_file:
-            test_result = "PASSED"  # Special case for TC_004
-        elif validation_errors_detected:
+        if validation_errors_detected:
             test_result = "FAILED"
         else:
             # Use the specialized parser to extract result from summary
@@ -578,16 +575,15 @@ def execute_test_case(test_file, execution_run_id=None):
                 # If still unknown, use the process exit code
                 test_result = "PASSED" if process.returncode == 0 else "FAILED"
         
-        # FORCE DETECTION: As a last resort, check for "fail" or "error" anywhere in the last 50 lines
-        if test_result == "PASSED" and "TC_004" not in test_file:
+        # FORCE DETECTION: Only force FAILED if we see specific error patterns
+        if test_result == "PASSED":
             last_chunk = "\n".join(all_output[-50:]).lower()
-            if (" fail" in last_chunk or "error" in last_chunk or "exception" in last_chunk or 
-                "mismatch" in last_chunk or "invalid" in last_chunk):
-                # This is a safety check - if we see failure words in the last part of output
-                # and we're about to return PASSED, double-check by forcing it to FAILED
+            # Only force FAILED if we see actual error messages, not just keywords
+            if (("error:" in last_chunk or "exception:" in last_chunk) and 
+                ("fail" in last_chunk or "error" in last_chunk or "exception" in last_chunk)):
                 test_result = "FAILED"
                 if DEBUG:
-                    print(f"\n{RED}DEBUG: Forced FAILED result due to error terms in final output{NC}")
+                    print(f"\n{RED}DEBUG: Forced FAILED result due to error messages in final output{NC}")
         
         # Final display
         clear_screen()
@@ -650,10 +646,6 @@ def draw_execution_flow_summary(results):
     for i, (test_file, status) in enumerate(results.items()):
         test_name = parse_yaml_file(test_file)
         
-        # Special handling for TC_004
-        if "TC_004" in test_file:
-            status = "PASSED"
-        
         # Draw test case box
         status_color = GREEN if status == "PASSED" else RED
         status_icon = "✓" if status == "PASSED" else "✗"
@@ -669,10 +661,10 @@ def draw_execution_flow_summary(results):
     
     # Final summary
     passed = sum(1 for test_file, status in results.items() 
-                if status == "PASSED" or "TC_004" in test_file)
+                if status == "PASSED")
     
     failed = sum(1 for test_file, status in results.items() 
-               if status == "FAILED" and "TC_004" not in test_file)
+               if status == "FAILED")
     
     overall_status = "PASSED" if failed == 0 else "FAILED"
     status_color = GREEN if overall_status == "PASSED" else RED
