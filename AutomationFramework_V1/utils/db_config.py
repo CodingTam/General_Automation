@@ -30,23 +30,63 @@ class DatabaseConfig:
     @property
     def database_path(self) -> str:
         """Get the database path from configuration"""
-        if not self._config or 'database' not in self._config or 'path' not in self._config['database']:
-            raise RuntimeError("Database path not found in configuration")
-        return self._config['database']['path']
+        if not self._config or 'database' not in self._config:
+            raise RuntimeError("Database configuration not found")
+        
+        db_config = self._config['database']
+        if db_config.get('db2use', 'db1').upper() == 'SQL':
+            # For SQL Server, return a placeholder path since we're using JDBC
+            return "sqlserver://{server}:{port}/{database}".format(
+                server=db_config['db2']['server'],
+                port=db_config['db2']['port'],
+                database=db_config['db2']['database']
+            )
+        else:
+            # For SQLite, return the actual file path
+            if 'db1' not in db_config or 'path' not in db_config['db1']:
+                raise RuntimeError("SQLite database path not found in configuration")
+            return db_config['db1']['path']
     
     @property
     def timeout(self) -> float:
         """Get the database timeout from configuration"""
-        return self._config.get('database', {}).get('timeout', 60.0)
+        db_config = self._config.get('database', {})
+        if db_config.get('db2use', 'db1').upper() == 'SQL':
+            return db_config.get('db2', {}).get('timeout', 60.0)
+        return db_config.get('db1', {}).get('timeout', 60.0)
     
     @property
     def max_retries(self) -> int:
         """Get the maximum number of connection retries from configuration"""
-        return self._config.get('database', {}).get('max_retries', 5)
+        db_config = self._config.get('database', {})
+        if db_config.get('db2use', 'db1').upper() == 'SQL':
+            return db_config.get('db2', {}).get('max_retries', 5)
+        return db_config.get('db1', {}).get('max_retries', 5)
     
     def get_all_config(self) -> Dict[str, Any]:
         """Get all database configuration settings"""
-        return self._config.get('database', {})
+        db_config = self._config.get('database', {})
+        active_db = db_config.get('db2use', 'db1').upper()
+        if active_db == 'SQL':
+            return {
+                'database_path': self.database_path,
+                'timeout': self.timeout,
+                'max_retries': self.max_retries,
+                'active_database': active_db,
+                **db_config.get('db2', {})
+            }
+        return {
+            'database_path': self.database_path,
+            'timeout': self.timeout,
+            'max_retries': self.max_retries,
+            'active_database': active_db,
+            **db_config.get('db1', {})
+        }
+    
+    @property
+    def active_database(self) -> str:
+        """Get the currently active database type"""
+        return self._config.get('database', {}).get('db2use', 'db1').upper()
 
 # Create a singleton instance
 db_config = DatabaseConfig() 

@@ -1,7 +1,37 @@
-# Framework-level configuration
+# Framework Configuration
+# This file contains all framework-related configuration settings
 
-# Database Configuration
+# Database connection settings
 database:
-  path: "/Users/tamilarasanrajendran/Documents/01.Projects/SQLITE/DATABASES/automation.db"
-  timeout: 60.0  # Database connection timeout in seconds
-  max_retries: 5  # Maximum number of connection retries 
+  # SQLite (DB1) Configuration
+  db1:
+    path: "data/framework.db"  # Relative path to the SQLite database
+    backup_dir: "data/backups"  # Directory for database backups
+    max_connections: 10
+    timeout: 30  # Connection timeout in seconds
+    max_retries: 3  # Maximum number of retries for database operations
+
+  # SQL Server (DB2) Configuration
+  db2:
+    server: "your_server_name"  # SQL Server hostname or IP
+    port: 1433  # SQL Server port
+    database: "your_database_name"  # Database name
+    username: "your_username"  # SQL Server username
+    password: "your_password"  # SQL Server password
+    driver: "com.microsoft.sqlserver.jdbc.SQLServerDriver"  # JDBC driver class
+    jdbc_url: "jdbc:sqlserver://{server}:{port};databaseName={database};encrypt=true;trustServerCertificate=true"
+    max_connections: 10
+    timeout: 30
+    max_retries: 3
+
+  # Active database selection
+  db2use: "db1"  # Options: "db1" for SQLite, "SQL" for SQL Server
+
+# Framework settings
+framework:
+  version: "1.0.0"
+  environment: "development"
+  log_level: "INFO"
+  log_file: "logs/framework.log"
+  temp_dir: "temp"
+  output_dir: "output"

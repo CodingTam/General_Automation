@@ -16,6 +16,7 @@ from utils.logger import logger, function_logger
 from utils.utils import find_key_columns
 from validation.comparison_utils import perform_comparison, generate_comparison_report, generate_html_report
 from utils.yaml_processor import process_test_case
+from utils.db_config import db_config
 
 def create_execution_context(traceability_id=None, execution_run_id=None, test_case_name=None, execution_id=None, schedule_id=None, parent_context=None):
     """Create a dictionary with execution context for logging"""
@@ -65,6 +66,10 @@ def main(yaml_file: str, traceability_id: str, execution_run_id: str = None, sch
             logger.info(f"Creating Spark session for test case: {os.path.basename(yaml_file)}", 
                        **exec_context)
             
+            # Load database configuration
+            db_settings = db_config.get_all_config()
+            
+            # Create Spark session with database configuration
             spark = SparkSession.builder \
                 .appName(f"Data Comparison - {os.path.basename(yaml_file)}") \
                 .config("spark.hadoop.fs.defaultFS", "hdfs://localhost:9000") \
@@ -73,6 +78,8 @@ def main(yaml_file: str, traceability_id: str, execution_run_id: str = None, sch
                 .config("spark.storage.blockManagerSlaveTimeoutMs", "120000") \
                 .config("spark.rpc.askTimeout", "120s") \
                 .config("spark.rpc.lookupTimeout", "120s") \
+                .config("spark.jars", "drivers/mssql-jdbc-12.6.2.jre11.jar") \
+                .config("spark.driver.extraClassPath", "drivers/mssql-jdbc-12.6.2.jre11.jar") \
                 .getOrCreate()
             
             # Record start time

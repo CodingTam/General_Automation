@@ -70,7 +70,7 @@ class DBHandler:
         retry_count = 0
         last_error = None
         
-        while retry_count < config.database_max_retries:
+        while retry_count < db_config.max_retries:
             try:
                 if self.conn is not None:
                     try:
@@ -80,7 +80,7 @@ class DBHandler:
                     self.conn = None
                 
                 # Add timeout and enable automatic transaction management
-                self.conn = sqlite3.connect(self.db_path, timeout=60.0)
+                self.conn = sqlite3.connect(self.db_path, timeout=db_config.timeout)
                 
                 # Enable WAL mode for better concurrency
                 self.conn.execute('PRAGMA journal_mode=WAL')
@@ -107,14 +107,14 @@ class DBHandler:
                 raise
         
         # If we get here, all retries failed
-        raise sqlite3.OperationalError(f"Failed to connect to database after {config.database_max_retries} attempts. Last error: {str(last_error)}")
+        raise sqlite3.OperationalError(f"Failed to connect to database after {db_config.max_retries} attempts. Last error: {str(last_error)}")
 
     def execute_with_retry(self, func, *args, **kwargs):
         """Execute a database operation with retry logic."""
         retry_count = 0
         last_error = None
         
-        while retry_count < config.database_max_retries:
+        while retry_count < db_config.max_retries:
             try:
                 # Ensure we have a valid connection
                 if not self._ensure_connection():
@@ -137,7 +137,7 @@ class DBHandler:
                 logger.error(f"Unexpected error in database operation: {str(e)}")
                 raise
         
-        raise sqlite3.OperationalError(f"Failed to execute database operation after {config.database_max_retries} attempts. Last error: {str(last_error)}")
+        raise sqlite3.OperationalError(f"Failed to execute database operation after {db_config.max_retries} attempts. Last error: {str(last_error)}")
 
     def __enter__(self):
         self._ensure_connection()
