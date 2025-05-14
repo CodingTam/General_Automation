@@ -16,23 +16,25 @@ from utils.validation import (
     validate_format_type, validate_date_format
 )
 from .config_loader import config
+from .db_config import db_config
 
 class DBHandler:
     """Handler for database operations"""
     
     _thread_local = threading.local()
     
-    def __init__(self, db_path: str = None, max_retries: int = None):
-        """Initialize the database handler with configurable path and retry settings."""
-        # Use provided values or fall back to framework configuration
-        self.db_path = db_path or config.database_path
-        self.max_retries = max_retries or config.database_max_retries
+    def __init__(self):
+        """Initialize database connection using configuration"""
+        self.db_path = db_config.database_path
+        self.conn = sqlite3.connect(self.db_path, timeout=db_config.timeout)
+        self.conn.row_factory = sqlite3.Row
+        self._ensure_tables_exist()
         
-        # Ensure the database directory exists
-        ensure_directory_exists(os.path.dirname(self.db_path))
-        
-        self.conn = None
-        self._connect()
+    def _ensure_tables_exist(self):
+        """Ensure necessary tables exist in the database"""
+        self.create_tables()
+        self.alter_tables()
+        self.verify_tables()
         
     def _ensure_connection(self):
         """Ensure we have a valid database connection."""
@@ -68,7 +70,7 @@ class DBHandler:
         retry_count = 0
         last_error = None
         
-        while retry_count < self.max_retries:
+        while retry_count < config.database_max_retries:
             try:
                 if self.conn is not None:
                     try:
@@ -105,14 +107,14 @@ class DBHandler:
                 raise
         
         # If we get here, all retries failed
-        raise sqlite3.OperationalError(f"Failed to connect to database after {self.max_retries} attempts. Last error: {str(last_error)}")
+        raise sqlite3.OperationalError(f"Failed to connect to database after {config.database_max_retries} attempts. Last error: {str(last_error)}")
 
     def execute_with_retry(self, func, *args, **kwargs):
         """Execute a database operation with retry logic."""
         retry_count = 0
         last_error = None
         
-        while retry_count < self.max_retries:
+        while retry_count < config.database_max_retries:
             try:
                 # Ensure we have a valid connection
                 if not self._ensure_connection():
@@ -135,7 +137,7 @@ class DBHandler:
                 logger.error(f"Unexpected error in database operation: {str(e)}")
                 raise
         
-        raise sqlite3.OperationalError(f"Failed to execute database operation after {self.max_retries} attempts. Last error: {str(last_error)}")
+        raise sqlite3.OperationalError(f"Failed to execute database operation after {config.database_max_retries} attempts. Last error: {str(last_error)}")
 
     def __enter__(self):
         self._ensure_connection()

@@ -1,0 +1,23 @@
+"""
+Database Configuration
+
+This file contains all database-related configuration settings.
+"""
+
+# Database connection settings
+database:
+  path: "data/framework.db"  # Relative path to the SQLite database
+  backup_dir: "data/backups"  # Directory for database backups
+  max_connections: 10
+  timeout: 30  # Connection timeout in seconds
+
+# Database schema settings
+schema:
+  version: "1.0"
+  tables:
+    - test_cases
+    - execution_runs
+    - test_results
+    - scheduler
+    - plugins
+    - metadata 

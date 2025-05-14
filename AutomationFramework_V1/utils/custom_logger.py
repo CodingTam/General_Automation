@@ -8,6 +8,7 @@ from datetime import datetime
 import uuid
 from typing import Optional, Dict, Any
 from .config_loader import config
+from .db_config import db_config
 
 # Configuration option to store all logs in the database
 STORE_ALL_LOGS_IN_DB = os.environ.get('STORE_ALL_LOGS_IN_DB', 'true').lower() == 'true'
@@ -15,43 +16,99 @@ STORE_ALL_LOGS_IN_DB = os.environ.get('STORE_ALL_LOGS_IN_DB', 'true').lower() ==
 class CustomLogger:
     """Custom logger that logs to both console and database"""
     
-    def __init__(self, db_path: str = None, force_recreate=False):
-        """Initialize the custom logger with configurable path."""
-        self.db_path = db_path or config.database_path
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        
-        # Configure logging
-        self.logger = logging.getLogger(__name__)
+    def __init__(self, name: str):
+        """Initialize custom logger with database configuration"""
+        self.name = name
+        self.db_path = db_config.database_path
+        self._setup_logger()
+
+    def _setup_logger(self):
+        """Set up the logger with database connection"""
+        self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.INFO)
         
-        # Connect to database
+        # Add console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+        
+        # Add database handler
         self.conn = sqlite3.connect(self.db_path)
-        
-        # Set up schema info - will be populated in _create_log_table
-        self.id_column_name = 'log_entry_id'  # Default name, may be overridden
-        
-        # Store the force_recreate parameter
-        self.force_recreate = force_recreate
-        
-        # Setup console logger FIRST, before calling _create_log_table
-        if not self.logger.handlers:
-            # Console handler
-            console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setLevel(logging.INFO)
-            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-            console_handler.setFormatter(formatter)
-            self.logger.addHandler(console_handler)
-        
-        # Now try to create or update the table
-        try:
-            self._create_log_table()
-        except sqlite3.OperationalError as e:
-            # Only report schema errors
-            print(f"Warning with log table schema: {e}")
-            print("Continuing with existing table structure...")
-        
-        self.logger.info(f"Logger initialized with database at: {self.db_path}")
+        self._ensure_log_table()
 
+    def _ensure_log_table(self):
+        """Ensure the log table exists in the database"""
+        cursor = self.conn.cursor()
+        
+        # Check if execution_log table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='execution_log'")
+        execution_log_exists = cursor.fetchone() is not None
+        
+        if not execution_log_exists:
+            # Create the execution_log table if it doesn't exist
+            print("Creating new execution_log table")
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS execution_log (
+                log_entry_id TEXT PRIMARY KEY,
+                execution_id TEXT,
+                timestamp TIMESTAMP,
+                level TEXT,
+                module TEXT,
+                function TEXT,
+                message TEXT,
+                error_details TEXT,
+                traceability_id TEXT,
+                execution_run_id TEXT,
+                test_case_name TEXT,
+                FOREIGN KEY (traceability_id) REFERENCES testcase(traceability_id),
+                FOREIGN KEY (execution_run_id) REFERENCES execution_run(execution_run_id) ON DELETE SET NULL
+            )
+            ''')
+            
+            # Create the indexes
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_execution_log_execution_id ON execution_log(execution_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_execution_log_level ON execution_log(level)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_execution_log_timestamp ON execution_log(timestamp)')
+            
+            self.conn.commit()
+            print("Created execution_log table")
+            
+            # Set the ID column name to our schema
+            self.id_column_name = 'log_entry_id'
+        else:
+            print("Using existing execution_log table")
+            
+            # Check what columns exist in the table
+            cursor.execute("PRAGMA table_info(execution_log)")
+            columns = cursor.fetchall()
+            column_names = [col[1] for col in columns]
+            
+            # Check which ID column exists
+            if 'log_entry_id' in column_names:
+                self.id_column_name = 'log_entry_id'
+            elif 'log_id' in column_names:
+                self.id_column_name = 'log_id'
+            else:
+                # If neither exists, add log_entry_id
+                print("Adding log_entry_id column to execution_log")
+                cursor.execute('ALTER TABLE execution_log ADD COLUMN log_entry_id TEXT')
+                self.id_column_name = 'log_entry_id'
+            
+            # Check for execution_id column
+            if 'execution_id' not in column_names:
+                print("Adding execution_id column to execution_log")
+                cursor.execute('ALTER TABLE execution_log ADD COLUMN execution_id TEXT')
+                # After adding the column, create the index
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_execution_log_execution_id ON execution_log(execution_id)')
+            
+            # Create other indexes if they don't exist
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_execution_log_level ON execution_log(level)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_execution_log_timestamp ON execution_log(timestamp)')
+        
+        self.conn.commit()
+    
     def _create_log_table(self):
         """Create execution_log table if it doesn't exist."""
         cursor = self.conn.cursor()
@@ -524,7 +581,7 @@ class CustomLogger:
 
 # Create a global logger instance
 # Set force_recreate to False so we don't recreate the table every time
-db_logger = CustomLogger(force_recreate=False)
+db_logger = CustomLogger(name="db_logger")
 
 def get_logger():
     """Get the global logger instance."""

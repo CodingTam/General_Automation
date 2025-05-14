@@ -1,24 +1,20 @@
 import sqlite3
+from .db_config import db_config
 
-conn = sqlite3.connect("/Users/tamilarasanrajendran/Documents/01.Projects/SQLITE/DATABASES/automation.db")
-cursor = conn.cursor()
+def check_tables():
+    """Check database tables using configuration"""
+    conn = sqlite3.connect(db_config.database_path)
+    cursor = conn.cursor()
+    
+    # Get list of tables
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cursor.fetchall()
+    
+    print("Database tables:")
+    for table in tables:
+        print(f"- {table[0]}")
+    
+    conn.close()
 
-print("\nChecking version_fallback_decisions table:")
-cursor.execute("SELECT * FROM version_fallback_decisions")
-rows = cursor.fetchall()
-if not rows:
-    print("Table is empty")
-else:
-    for row in rows:
-        print(row)
-
-print("\nChecking module_execution_issues table:")
-cursor.execute("SELECT * FROM module_execution_issues")
-rows = cursor.fetchall()
-if not rows:
-    print("Table is empty")
-else:
-    for row in rows:
-        print(row)
-
-conn.close() 
+if __name__ == "__main__":
+    check_tables() 

@@ -8,9 +8,8 @@ from typing import Any, Dict, Optional
 from utils.common import ensure_directory_exists, get_timestamp
 from .config_loader import config
 import inspect
-
-# Default DB path - same as used in other modules
-DEFAULT_DB_PATH = "/Users/tamilarasanrajendran/Documents/01.Projects/SQLITE/DATABASES/automation.db"
+from datetime import datetime
+from .db_config import db_config
 
 class SensitiveDataFilter:
     """Filter to sanitize sensitive data from log messages."""
@@ -68,7 +67,7 @@ class SecureDBHandler:
     
     def __init__(self, db_path: str = None):
         """Initialize the secure database handler with configurable path."""
-        self.db_path = db_path or config.database_path
+        self.db_path = db_path or db_config.database_path
         ensure_directory_exists(os.path.dirname(self.db_path))
         
         # Set secure permissions if file exists
@@ -175,7 +174,7 @@ class SecureLogger:
     """Thread-safe secure logger with sanitization."""
     
     def __init__(self, name: str = "AutomationLogger", 
-                 db_path: str = DEFAULT_DB_PATH,
+                 db_path: str = None,
                  log_dir: str = "logs"):
         self._logger = logging.getLogger(name)
         self._logger.setLevel(logging.INFO)
@@ -206,7 +205,7 @@ class SecureLogger:
         self._logger.addHandler(file_handler)
         
         # Secure database handler
-        self.db_handler = SecureDBHandler(db_path)
+        self.db_handler = SecureDBHandler(db_path or db_config.database_path)
         
         # Add the _get_caller_info method
         self._get_caller_info = _get_caller_info
@@ -367,4 +366,42 @@ def secure_function_logger(func):
     return wrapper
 
 # For backward compatibility
-function_logger = secure_function_logger 
+function_logger = secure_function_logger
+
+class Logger:
+    def __init__(self):
+        """Initialize logger with database configuration"""
+        self.db_path = db_config.database_path
+        self._setup_logger()
+    
+    def _setup_logger(self):
+        """Set up the logger with database connection"""
+        self.logger = logging.getLogger('framework')
+        self.logger.setLevel(logging.INFO)
+        
+        # Add console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+        
+        # Add database handler
+        self.conn = sqlite3.connect(self.db_path)
+        self._ensure_log_table()
+    
+    def _ensure_log_table(self):
+        """Ensure the log table exists in the database"""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS execution_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                level TEXT,
+                message TEXT,
+                module TEXT,
+                function TEXT,
+                line INTEGER
+            )
+        ''')
+        self.conn.commit() 

@@ -5,18 +5,14 @@ import os
 from datetime import datetime
 from typing import Optional
 from .config_loader import config
+from .db_config import db_config
 
 def connect_db() -> Optional[sqlite3.Connection]:
-    """Connect to the SQLite database."""
-    if not os.path.exists(config.database_path):
-        print(f"Database file not found at: {config.database_path}")
-        return None
-    
+    """Connect to database using configuration"""
     try:
-        conn = sqlite3.connect(config.database_path)
-        print(f"Connected to database at: {config.database_path}")
+        conn = sqlite3.connect(db_config.database_path)
         return conn
-    except sqlite3.Error as e:
+    except Exception as e:
         print(f"Error connecting to database: {e}")
         return None
 
