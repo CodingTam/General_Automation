@@ -1,7 +1,7 @@
 import os
 import yaml
 import sqlite3
-import pyodbc
+import jaydebeapi
 from pyspark.sql import SparkSession
 from typing import Union, Dict, Any
 import logging
@@ -10,21 +10,21 @@ from utils.config_loader import load_config
 
 logger = logging.getLogger(__name__)
 
-def get_db_connection() -> Union[sqlite3.Connection, pyodbc.Connection]:
+def get_db_connection() -> Union[sqlite3.Connection, jaydebeapi.Connection]:
     """
     Get database connection based on configuration.
     Returns either SQLite connection or SQL Server connection based on db2use setting.
     
     The db2use setting can be:
     - "db1": Use SQLite database (default)
-    - "SQL": Use SQL Server database through pyodbc
+    - "SQL": Use SQL Server database through jaydebeapi
     """
     config = load_config()
     db_config = config['database']
     db2use = db_config.get('db2use', 'db1').upper()
 
     if db2use == 'SQL':
-        logger.info("Using SQL Server database (db2) through pyodbc")
+        logger.info("Using SQL Server database (db2) through jaydebeapi")
         return get_sql_server_connection(db_config['db2'])
     else:
         logger.info("Using SQLite database (db1)")
@@ -40,20 +40,24 @@ def get_sqlite_connection(db_config: Dict[str, Any]) -> sqlite3.Connection:
         logger.error(f"Error connecting to SQLite database: {e}")
         raise
 
-def get_sql_server_connection(db_config: Dict[str, Any]) -> pyodbc.Connection:
-    """Create and return pyodbc connection for SQL Server."""
+def get_sql_server_connection(db_config: Dict[str, Any]) -> jaydebeapi.Connection:
+    """Create and return jaydebeapi connection for SQL Server."""
     try:
-        conn_str = (
-            "DRIVER={ODBC Driver 17 for SQL Server};"
-            f"SERVER={db_config['hostname']},{db_config['port']};"
-            f"DATABASE={db_config['database']};"
-            f"UID={db_config['username']};"
-            f"PWD={db_config['password']}"
+        jdbc_url = f"jdbc:sqlserver://{db_config['hostname']}:{db_config['port']};databaseName={db_config['database']}"
+        jar_path = os.path.join('drivers', 'mssql-jdbc-12.6.2.jre11.jar')
+        
+        if not os.path.exists(jar_path):
+            raise FileNotFoundError(f"JDBC driver not found at {jar_path}")
+            
+        conn = jaydebeapi.connect(
+            "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+            jdbc_url,
+            [db_config['username'], db_config['password']],
+            jar_path
         )
-        conn = pyodbc.connect(conn_str)
         logger.info("Successfully connected to SQL Server database")
         return conn
-    except pyodbc.Error as e:
+    except Exception as e:
         logger.error(f"Error connecting to SQL Server database: {e}")
         raise
 

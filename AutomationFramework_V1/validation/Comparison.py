@@ -150,6 +150,10 @@ def main(yaml_file: str, traceability_id: str, execution_run_id: str = None, sch
                 results["sid"] = test_config.get('sid')
                 # Add table_name to results
                 results["table_name"] = test_config.get('table_name')
+                # Add test case name to results
+                results["test_case_name"] = test_config.get('test_case_name')
+                # Add YAML file path to results
+                results["yaml_file"] = yaml_file
                 
                 # Generate report
                 logger.info("Generating text comparison report", 

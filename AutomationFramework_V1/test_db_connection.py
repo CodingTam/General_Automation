@@ -1,7 +1,7 @@
 import logging
 import sys
 import os
-import pyodbc
+import jaydebeapi
 from utils.config_loader import load_config
 import yaml
 
@@ -13,13 +13,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def check_sql_server_dependencies():
-    """Check if SQL Server ODBC driver is available."""
+    """Check if SQL Server JDBC driver is available."""
     try:
-        # Check if ODBC driver is installed
-        drivers = pyodbc.drivers()
-        if not any('SQL Server' in driver for driver in drivers):
-            logger.error("SQL Server ODBC driver not found")
-            logger.error("Please install ODBC Driver 17 for SQL Server")
+        jar_path = os.path.join('drivers', 'mssql-jdbc-12.6.2.jre11.jar')
+        if not os.path.exists(jar_path):
+            logger.error(f"SQL Server JDBC driver not found at {jar_path}")
             return False
         return True
     except Exception as e:

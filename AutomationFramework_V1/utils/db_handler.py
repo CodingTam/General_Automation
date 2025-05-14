@@ -1,5 +1,5 @@
 import sqlite3
-import pyodbc
+import jaydebeapi
 from datetime import datetime, timedelta
 import uuid
 from typing import Dict, List, Optional, Union
@@ -40,7 +40,7 @@ class DBHandler:
     def _ensure_connection(self):
         """Ensure we have a valid database connection."""
         try:
-            if isinstance(self.conn, (sqlite3.Connection, pyodbc.Connection)):
+            if isinstance(self.conn, (sqlite3.Connection, jaydebeapi.Connection)):
                 # Test if connection is alive
                 if self.conn is not None:
                     try:
@@ -48,7 +48,7 @@ class DBHandler:
                         cursor.execute("SELECT 1")
                         cursor.close()
                         return True
-                    except (sqlite3.OperationalError, sqlite3.ProgrammingError, pyodbc.Error):
+                    except (sqlite3.OperationalError, sqlite3.ProgrammingError, Exception):
                         logger.debug("Database connection test failed, reconnecting...")
                         self.conn = None
         except Exception:
@@ -78,7 +78,7 @@ class DBHandler:
             try:
                 if self.conn is not None:
                     try:
-                        if isinstance(self.conn, (sqlite3.Connection, pyodbc.Connection)):
+                        if isinstance(self.conn, (sqlite3.Connection, jaydebeapi.Connection)):
                             self.conn.close()
                     except Exception:
                         pass
@@ -125,7 +125,7 @@ class DBHandler:
                 return func(*args, **kwargs)
                 
             except Exception as e:
-                if isinstance(self.conn, (sqlite3.Connection, pyodbc.Connection)) and ("database is locked" in str(e) or "no such table" in str(e).lower()):
+                if isinstance(self.conn, (sqlite3.Connection, jaydebeapi.Connection)) and ("database is locked" in str(e) or "no such table" in str(e).lower()):
                     last_error = e
                     retry_count += 1
                     logger.warning(f"Database operation attempt {retry_count} failed: {str(e)}")
@@ -152,7 +152,7 @@ class DBHandler:
         """Close the database connection properly."""
         try:
             if self.conn:
-                if isinstance(self.conn, (sqlite3.Connection, pyodbc.Connection)):
+                if isinstance(self.conn, (sqlite3.Connection, jaydebeapi.Connection)):
                     if isinstance(self.conn, sqlite3.Connection):
                         self.conn.commit()  # Commit any pending transactions
                     self.conn.close()

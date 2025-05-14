@@ -1,5 +1,10 @@
 from typing import Dict, List
 from datetime import datetime
+import yaml
+import os
+import json
+import csv
+import base64
 
 
 def generate_html_report(results: Dict, output_path: str) -> None:
@@ -12,6 +17,16 @@ def generate_html_report(results: Dict, output_path: str) -> None:
     """
     # Get table name and test case info
     table_name = results.get("table_name", "Unknown")
+    test_case_name = results.get("test_case_name", os.path.basename(results.get("yaml_file", "Unknown")))
+    
+    # Calculate execution duration if available
+    start_time = results.get("start_time")
+    end_time = results.get("end_time")
+    execution_duration = None
+    if start_time and end_time:
+        start = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S')
+        end = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
+        execution_duration = str(end - start)
     
     # Start building HTML content
     html_content = f'''
@@ -20,8 +35,9 @@ def generate_html_report(results: Dict, output_path: str) -> None:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Data Comparison Report - {table_name}</title>
+        <title>ONETEST - Data Comparison Report - {table_name}</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
         <style>
             body {{
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -40,22 +56,22 @@ def generate_html_report(results: Dict, output_path: str) -> None:
             }}
             h1, h2, h3, h4 {{
                 color: #264653;
-                margin-bottom: 15px;
+                margin-bottom: 10px;
             }}
             h1 {{
                 border-bottom: 2px solid #2a9d8f;
-                padding-bottom: 10px;
+                padding-bottom: 6px;
             }}
             h2 {{
                 border-bottom: 1px solid #e9c46a;
-                padding-bottom: 8px;
-                margin-top: 25px;
+                padding-bottom: 5px;
+                margin-top: 15px;
             }}
             .section {{
                 margin-bottom: 15px;
                 background-color: #ffffff;
                 border-radius: 6px;
-                padding: 15px;
+                padding: 12px;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             }}
             .summary-section {{
@@ -64,12 +80,12 @@ def generate_html_report(results: Dict, output_path: str) -> None:
             }}
             table {{
                 width: 100%;
-                margin-bottom: 20px;
+                margin-bottom: 15px;
                 border-collapse: collapse;
             }}
             th, td {{
-                padding: 12px 15px;
-                text-align: center;
+                padding: 8px 12px;
+                text-align: left;
                 border: 1px solid #ddd;
             }}
             th {{
@@ -91,8 +107,8 @@ def generate_html_report(results: Dict, output_path: str) -> None:
                 font-weight: bold;
             }}
             .summary-box {{
-                padding: 15px;
-                margin-bottom: 20px;
+                padding: 12px;
+                margin-bottom: 15px;
                 border-radius: 6px;
             }}
             .pass-box {{
@@ -105,7 +121,7 @@ def generate_html_report(results: Dict, output_path: str) -> None:
             }}
             .badge {{
                 display: inline-block;
-                padding: 5px 10px;
+                padding: 4px 8px;
                 border-radius: 3px;
                 font-size: 12px;
                 font-weight: bold;
@@ -120,8 +136,8 @@ def generate_html_report(results: Dict, output_path: str) -> None:
                 color: white;
             }}
             .mismatch-sample {{
-                margin-top: 15px;
-                padding: 15px;
+                margin-top: 12px;
+                padding: 12px;
                 background-color: #f8f9fa;
                 border: 1px solid #e9ecef;
                 border-radius: 6px;
@@ -129,27 +145,27 @@ def generate_html_report(results: Dict, output_path: str) -> None:
             .timestamp {{
                 color: #6c757d;
                 font-size: 14px;
-                margin-bottom: 20px;
+                margin-bottom: 15px;
             }}
             .total-count {{
                 font-size: 18px;
                 font-weight: bold;
-                margin-bottom: 10px;
+                margin-bottom: 8px;
             }}
             .report-header {{
                 display: flex;
                 justify-content: space-between;
-                align-items: center;
-                margin-bottom: 30px;
+                align-items: flex-start;
+                margin-bottom: 20px;
             }}
             .validation-summary {{
                 display: flex;
                 flex-wrap: wrap;
-                gap: 10px;
-                margin-bottom: 20px;
+                gap: 8px;
+                margin-bottom: 10px;
             }}
             .validation-item {{
-                padding: 10px 15px;
+                padding: 8px 12px;
                 border-radius: 6px;
                 flex-grow: 1;
                 text-align: center;
@@ -158,20 +174,170 @@ def generate_html_report(results: Dict, output_path: str) -> None:
             .table-responsive {{
                 overflow-x: auto;
             }}
+            .config-table {{
+                width: 100%;
+                margin-bottom: 15px;
+            }}
+            .config-table th {{
+                width: 30%;
+                text-align: left;
+            }}
+            .config-table td {{
+                width: 70%;
+            }}
+            .summary-info-box {{
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 12px;
+                margin-bottom: 15px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }}
+            .summary-info-box h4 {{
+                color: #264653;
+                margin-bottom: 12px;
+                border-bottom: 2px solid #2a9d8f;
+                padding-bottom: 6px;
+            }}
+            .summary-info-item {{
+                margin-bottom: 8px;
+            }}
+            .summary-info-label {{
+                font-weight: 600;
+                color: #495057;
+            }}
+            .summary-info-value {{
+                color: #212529;
+            }}
+            details {{
+                margin: 15px 0;
+                padding: 12px;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 6px;
+            }}
+            details summary {{
+                cursor: pointer;
+                font-weight: 600;
+                color: #264653;
+            }}
+            details pre {{
+                margin-top: 12px;
+                padding: 12px;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                overflow-x: auto;
+            }}
+            .recommendations {{
+                background-color: #fff3cd;
+                border: 1px solid #ffeeba;
+                border-radius: 6px;
+                padding: 12px;
+                margin: 15px 0;
+            }}
+            .recommendations h3 {{
+                color: #856404;
+                margin-bottom: 12px;
+            }}
+            .recommendations ul {{
+                margin-bottom: 0;
+            }}
+            .recommendations li {{
+                margin-bottom: 6px;
+            }}
+            .section-icon {{
+                margin-right: 6px;
+                color: #264653;
+            }}
+            .section-divider {{
+                height: 1px;
+                background-color: #dee2e6;
+                margin: 15px 0;
+            }}
         </style>
     </head>
     <body>
         <div class="container">
             <div class="report-header">
                 <div>
-                    <h1>Data Comparison Report</h1>
+                    <h1>ONETEST - Data Comparison Report</h1>
                     <p class="timestamp">Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
                 </div>
-                <div class="text-end">
-                    <h4>Table: {table_name}</h4>
+                <div class="summary-info-box" style="width: 300px;">
+                    <h4>Test Summary</h4>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Test Case:</span>
+                        <span class="summary-info-value">{test_case_name}</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Table:</span>
+                        <span class="summary-info-value">{table_name}</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Source Type:</span>
+                        <span class="summary-value">{results.get('source_type', 'N/A')}</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Target Type:</span>
+                        <span class="summary-value">{results.get('target_type', 'N/A')}</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">SID:</span>
+                        <span class="summary-value">{results.get('sid', 'N/A')}</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Status:</span>
+                        <span class="summary-value">{results.get('overall_status', 'N/A')}</span>
+                    </div>
                 </div>
             </div>
+            
+            <div class="section-divider"></div>
+            
+            <!-- Run Metadata Section -->
+            <div class="section">
+                <h2><i class="fas fa-flask section-icon"></i>Run Metadata</h2>
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <th>Framework Version</th>
+                                <td>ONETEST 1.0.0</td>
+                            </tr>
+                            <tr>
+                                <th>Execution Environment</th>
+                                <td>{results.get('environment', 'N/A')}</td>
+                            </tr>
+                            <tr>
+                                <th>Execution Timestamp</th>
+                                <td>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</td>
+                            </tr>
+                            <tr>
+                                <th>Execution Duration</th>
+                                <td>{execution_duration or 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Partition Date</th>
+                                <td>{results.get('partition_date', 'N/A')}</td>
+                            </tr>
+                            <tr>
+                                <th>Triggered By</th>
+                                <td>{results.get('sid', 'N/A')}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="section-divider"></div>
     '''
+    
+    # Add test case configuration section
+    html_content += _generate_config_section(results)
+    
+    # Add raw YAML view
+    html_content += _generate_raw_yaml_section(results)
     
     # Add overview section
     html_content += _generate_overview_section(results)
@@ -196,6 +362,9 @@ def generate_html_report(results: Dict, output_path: str) -> None:
     if "Rule Validation" in results["validations_performed"]:
         html_content += _generate_rule_section(results)
     
+    # Add recommendations section
+    html_content += _generate_recommendations_section(results)
+    
     # Add final assessment section
     html_content += _generate_final_section(results)
     
@@ -204,11 +373,10 @@ def generate_html_report(results: Dict, output_path: str) -> None:
         </div>
         
         <footer class="text-center py-4">
-            <p class="text-muted">Generated by Data Comparison Framework</p>
+            <p class="text-muted">Generated by ONETEST Data Comparison Framework</p>
         </footer>
         
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
     </body>
     </html>
     '''
@@ -220,11 +388,115 @@ def generate_html_report(results: Dict, output_path: str) -> None:
     print(f"HTML report generated successfully at: {output_path}")
 
 
+def _generate_config_section(results: Dict) -> str:
+    """Generate the HTML test case configuration section."""
+    html = '''
+            <div class="section">
+                <h2><i class="fas fa-cog section-icon"></i>Test Case Configuration</h2>
+                <div class="table-responsive">
+                    <table class="table table-bordered config-table">
+                        <thead>
+                            <tr>
+                                <th>Field Name</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    '''
+    
+    # Load YAML file if available
+    yaml_file = results.get("yaml_file")
+    if yaml_file and os.path.exists(yaml_file):
+        try:
+            with open(yaml_file, 'r') as f:
+                yaml_data = yaml.safe_load(f)
+                
+                # Flatten nested YAML structure
+                def flatten_dict(d, parent_key='', sep='_'):
+                    items = []
+                    for k, v in d.items():
+                        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+                        if isinstance(v, dict):
+                            items.extend(flatten_dict(v, new_key, sep=sep).items())
+                        else:
+                            items.append((new_key, v))
+                    return dict(items)
+                
+                # Flatten and sort the YAML data
+                flat_data = flatten_dict(yaml_data)
+                sorted_items = sorted(flat_data.items())
+                
+                # Add each field to the table
+                for field_name, value in sorted_items:
+                    # Format the value
+                    if value is None:
+                        value = ""
+                    elif isinstance(value, (list, dict)):
+                        value = str(value)
+                    
+                    html += f'''
+                            <tr>
+                                <td>{field_name}</td>
+                                <td>{value}</td>
+                            </tr>
+                    '''
+        except Exception as e:
+            html += f'''
+                            <tr>
+                                <td colspan="2" class="text-danger">Error loading YAML configuration: {str(e)}</td>
+                            </tr>
+            '''
+    else:
+        html += '''
+                            <tr>
+                                <td colspan="2" class="text-warning">No YAML configuration file available</td>
+                            </tr>
+        '''
+    
+    html += '''
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+    '''
+    
+    return html
+
+
+def _generate_raw_yaml_section(results: Dict) -> str:
+    """Generate the HTML raw YAML view section."""
+    yaml_file = results.get("yaml_file")
+    if not yaml_file or not os.path.exists(yaml_file):
+        return ""
+    
+    try:
+        with open(yaml_file, 'r') as f:
+            yaml_content = f.read()
+        
+        return f'''
+            <div class="section">
+                <details>
+                    <summary><i class="fas fa-code section-icon"></i>View Raw YAML</summary>
+                    <pre>{yaml_content}</pre>
+                </details>
+            </div>
+        '''
+    except Exception as e:
+        return f'''
+            <div class="section">
+                <details>
+                    <summary><i class="fas fa-code section-icon"></i>View Raw YAML</summary>
+                    <pre>Error loading YAML file: {str(e)}</pre>
+                </details>
+            </div>
+        '''
+
+
 def _generate_overview_section(results: Dict) -> str:
     """Generate the HTML overview section."""
     html = '''
             <div class="section summary-section">
-                <h2>Overview</h2>
+                <h2><i class="fas fa-chart-bar section-icon"></i>Overview</h2>
                 <div class="row">
                     <div class="col-md-6">
                         <div class="card mb-3">
@@ -261,7 +533,7 @@ def _generate_overview_section(results: Dict) -> str:
                     </div>
                 </div>
 
-                <h3>Validation Summary</h3>
+                <h3><i class="fas fa-clipboard-check section-icon"></i>Validation Summary</h3>
                 <div class="validation-summary">
     '''
     
@@ -673,6 +945,59 @@ def _generate_rule_section(results: Dict) -> str:
         '''
     
     html += '''
+            </div>
+    '''
+    
+    return html
+
+
+def _generate_recommendations_section(results: Dict) -> str:
+    """Generate the HTML recommendations section."""
+    recommendations = []
+    
+    # Check for failed columns
+    data_validation = results.get("data_validation", {})
+    if data_validation.get("column_comparisons"):
+        failed_columns = [col for col in data_validation["column_comparisons"] if col['status'] == "FAIL"]
+        for col in failed_columns:
+            recommendations.append(
+                f"Column '{col['column_name']}' failed with {col['total_records'] - col['pass_count']} mismatches — "
+                f"check data formatting or join logic."
+            )
+    
+    # Check for null issues
+    null_checks = results.get("null_checks", {}).get("columns", {})
+    for col_name, stats in null_checks.items():
+        if stats.get('null_percentage', 0) > 0:
+            recommendations.append(
+                f"Column '{col_name}' has {stats.get('null_percentage', 0):.2f}% null values — "
+                f"verify if this is expected."
+            )
+    
+    # Check for duplicate issues
+    dup_checks = results.get("duplicate_checks", {})
+    if dup_checks.get('duplicate_percentage', 0) > 0:
+        recommendations.append(
+            f"Found {dup_checks.get('duplicate_percentage', 0):.2f}% duplicate records — "
+            f"investigate if this is acceptable."
+        )
+    
+    if not recommendations:
+        return ""
+    
+    html = '''
+            <div class="section recommendations">
+                <h3><i class="fas fa-lightbulb section-icon"></i>What to Investigate</h3>
+                <ul>
+    '''
+    
+    for rec in recommendations:
+        html += f'''
+                    <li>{rec}</li>
+        '''
+    
+    html += '''
+                </ul>
             </div>
     '''
     
