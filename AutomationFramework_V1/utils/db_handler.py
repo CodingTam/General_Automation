@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime, timedelta
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 import os
 from utils.logger import logger, function_logger
 import json
@@ -17,6 +17,8 @@ from utils.validation import (
 )
 from .config_loader import config
 from .db_config import db_config
+from .db_utils import get_db_connection, create_table_if_not_exists, insert_data
+from pyspark.sql import SparkSession
 
 class DBHandler:
     """Handler for database operations"""
@@ -25,9 +27,7 @@ class DBHandler:
     
     def __init__(self):
         """Initialize database connection using configuration"""
-        self.db_path = db_config.database_path
-        self.conn = sqlite3.connect(self.db_path, timeout=db_config.timeout)
-        self.conn.row_factory = sqlite3.Row
+        self.conn = get_db_connection()
         self._ensure_tables_exist()
         
     def _ensure_tables_exist(self):
@@ -39,14 +39,18 @@ class DBHandler:
     def _ensure_connection(self):
         """Ensure we have a valid database connection."""
         try:
-            # Test if connection is alive
-            if self.conn is not None:
-                try:
-                    self.conn.execute("SELECT 1")
-                    return True
-                except (sqlite3.OperationalError, sqlite3.ProgrammingError):
-                    logger.debug("Database connection test failed, reconnecting...")
-                    self.conn = None
+            if isinstance(self.conn, sqlite3.Connection):
+                # Test if SQLite connection is alive
+                if self.conn is not None:
+                    try:
+                        self.conn.execute("SELECT 1")
+                        return True
+                    except (sqlite3.OperationalError, sqlite3.ProgrammingError):
+                        logger.debug("Database connection test failed, reconnecting...")
+                        self.conn = None
+            else:
+                # For SparkSession, we don't need to test connection
+                return True
         except Exception:
             self.conn = None
         
@@ -74,21 +78,23 @@ class DBHandler:
             try:
                 if self.conn is not None:
                     try:
-                        self.conn.close()
+                        if isinstance(self.conn, sqlite3.Connection):
+                            self.conn.close()
                     except Exception:
                         pass
                     self.conn = None
                 
-                # Add timeout and enable automatic transaction management
-                self.conn = sqlite3.connect(self.db_path, timeout=db_config.timeout)
+                # Get new connection
+                self.conn = get_db_connection()
                 
-                # Enable WAL mode for better concurrency
-                self.conn.execute('PRAGMA journal_mode=WAL')
-                self.conn.execute('PRAGMA busy_timeout=60000')  # 60 second busy timeout
-                # Enable foreign keys
-                self.conn.execute('PRAGMA foreign_keys=ON')
+                if isinstance(self.conn, sqlite3.Connection):
+                    # Enable WAL mode for better concurrency
+                    self.conn.execute('PRAGMA journal_mode=WAL')
+                    self.conn.execute('PRAGMA busy_timeout=60000')  # 60 second busy timeout
+                    # Enable foreign keys
+                    self.conn.execute('PRAGMA foreign_keys=ON')
                 
-                logger.info(f"Connected to database at: {self.db_path}")
+                logger.info("Successfully connected to database")
                 
                 # Initialize tables only on successful connection
                 self.create_tables()
@@ -96,18 +102,14 @@ class DBHandler:
                 self.verify_tables()
                 return True
                 
-            except sqlite3.OperationalError as e:
+            except Exception as e:
                 last_error = e
                 retry_count += 1
                 logger.warning(f"Database connection attempt {retry_count} failed: {str(e)}")
                 time.sleep(1)  # Wait 1 second before retrying
-                
-            except Exception as e:
-                logger.error(f"Unexpected error connecting to database: {str(e)}")
-                raise
         
         # If we get here, all retries failed
-        raise sqlite3.OperationalError(f"Failed to connect to database after {db_config.max_retries} attempts. Last error: {str(last_error)}")
+        raise Exception(f"Failed to connect to database after {db_config.max_retries} attempts. Last error: {str(last_error)}")
 
     def execute_with_retry(self, func, *args, **kwargs):
         """Execute a database operation with retry logic."""
@@ -118,12 +120,12 @@ class DBHandler:
             try:
                 # Ensure we have a valid connection
                 if not self._ensure_connection():
-                    raise sqlite3.OperationalError("Failed to establish database connection")
+                    raise Exception("Failed to establish database connection")
                     
                 return func(*args, **kwargs)
                 
-            except sqlite3.OperationalError as e:
-                if "database is locked" in str(e) or "no such table" in str(e).lower():
+            except Exception as e:
+                if isinstance(self.conn, sqlite3.Connection) and ("database is locked" in str(e) or "no such table" in str(e).lower()):
                     last_error = e
                     retry_count += 1
                     logger.warning(f"Database operation attempt {retry_count} failed: {str(e)}")
@@ -137,7 +139,7 @@ class DBHandler:
                 logger.error(f"Unexpected error in database operation: {str(e)}")
                 raise
         
-        raise sqlite3.OperationalError(f"Failed to execute database operation after {db_config.max_retries} attempts. Last error: {str(last_error)}")
+        raise Exception(f"Failed to execute database operation after {db_config.max_retries} attempts. Last error: {str(last_error)}")
 
     def __enter__(self):
         self._ensure_connection()
@@ -150,8 +152,9 @@ class DBHandler:
         """Close the database connection properly."""
         try:
             if self.conn:
-                self.conn.commit()  # Commit any pending transactions
-                self.conn.close()
+                if isinstance(self.conn, sqlite3.Connection):
+                    self.conn.commit()  # Commit any pending transactions
+                    self.conn.close()
                 self.conn = None
                 logger.debug("Database connection closed successfully")
         except Exception as e:
@@ -161,273 +164,238 @@ class DBHandler:
     @function_logger
     def verify_tables(self):
         """Verify that tables exist and print their structure."""
-        cursor = self.conn.cursor()
-        
-        # Get list of tables
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        
-        logger.info("Verifying database tables")
-        for table in tables:
-            table_name = table[0]
-            logger.debug(f"Verifying table: {table_name}")
+        if isinstance(self.conn, sqlite3.Connection):
+            cursor = self.conn.cursor()
             
-            # Get table structure
-            cursor.execute(f"PRAGMA table_info({table_name});")
-            columns = cursor.fetchall()
+            # Get list of tables
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = cursor.fetchall()
             
-            column_info = [f"{col[1]} ({col[2]})" for col in columns]
-            logger.debug(f"Table {table_name} columns: {', '.join(column_info)}")
-        
-        logger.info(f"Verified {len(tables)} tables in database")
-    
+            logger.info("Verifying database tables")
+            for table in tables:
+                table_name = table[0]
+                logger.debug(f"Verifying table: {table_name}")
+                
+                # Get table structure
+                cursor.execute(f"PRAGMA table_info({table_name});")
+                columns = cursor.fetchall()
+                
+                column_info = [f"{col[1]} ({col[2]})" for col in columns]
+                logger.debug(f"Table {table_name} columns: {', '.join(column_info)}")
+            
+            logger.info(f"Verified {len(tables)} tables in database")
+        else:
+            # For SQL Server, we'll use Spark to verify tables
+            try:
+                tables = self.conn.catalog.listTables()
+                logger.info("Verifying database tables")
+                for table in tables:
+                    table_name = table.name
+                    logger.debug(f"Verifying table: {table_name}")
+                    
+                    # Get table structure
+                    df = self.conn.table(table_name)
+                    columns = df.schema.fields
+                    
+                    column_info = [f"{col.name} ({col.dataType})" for col in columns]
+                    logger.debug(f"Table {table_name} columns: {', '.join(column_info)}")
+                
+                logger.info(f"Verified {len(tables)} tables in database")
+            except Exception as e:
+                logger.error(f"Error verifying tables in SQL Server: {e}")
+                raise
+
     @function_logger
     def create_tables(self):
         """Create necessary database tables if they don't exist."""
-        cursor = self.conn.cursor()
+        # Define table schemas
+        tables = {
+            'testcase': {
+                'traceability_id': 'VARCHAR(255) PRIMARY KEY',
+                'sid': 'VARCHAR(255)',
+                'table_name': 'VARCHAR(255)',
+                'test_case_name': 'VARCHAR(255)',
+                'run_type': 'VARCHAR(50)',
+                'source_type': 'VARCHAR(50)',
+                'source_location': 'VARCHAR(255)',
+                'source_partition_column': 'VARCHAR(255)',
+                'source_partition_date': 'VARCHAR(50)',
+                'source_copybook_location': 'VARCHAR(255)',
+                'source_supporting_file': 'VARCHAR(255)',
+                'is_multi_source': 'INTEGER',
+                'source_type_2': 'VARCHAR(50)',
+                'source_location_2': 'VARCHAR(255)',
+                'source_partition_column_2': 'VARCHAR(255)',
+                'source_partition_date_2': 'VARCHAR(50)',
+                'source_copybook_location_2': 'VARCHAR(255)',
+                'source_supporting_file_2': 'VARCHAR(255)',
+                'source_processor_enabled': 'INTEGER',
+                'source_processor_code': 'TEXT',
+                'schema_definition': 'TEXT',
+                'target_type': 'VARCHAR(50)',
+                'target_location': 'VARCHAR(255)',
+                'target_partition_column': 'VARCHAR(255)',
+                'target_partition_date': 'VARCHAR(50)',
+                'target_copybook_location': 'VARCHAR(255)',
+                'target_supporting_file': 'VARCHAR(255)',
+                'column_names': 'TEXT',
+                'execution_notes': 'TEXT',
+                'key_columns': 'TEXT',
+                'validation_types': 'TEXT',
+                'rules': 'TEXT',
+                'alert_rules': 'TEXT',
+                'parent_jira_ticket': 'VARCHAR(255)',
+                'test_plan_jira_ticket': 'VARCHAR(255)',
+                'environment': 'VARCHAR(50)',
+                'release_name': 'VARCHAR(255)',
+                'created_at': 'TIMESTAMP',
+                'updated_at': 'TIMESTAMP',
+                'format_versions': 'TEXT'
+            },
+            'execution_run': {
+                'execution_run_id': 'VARCHAR(255) PRIMARY KEY',
+                'run_name': 'VARCHAR(255)',
+                'start_time': 'TIMESTAMP',
+                'end_time': 'TIMESTAMP',
+                'total_test_cases': 'INTEGER DEFAULT 0',
+                'passed_test_cases': 'INTEGER DEFAULT 0',
+                'failed_test_cases': 'INTEGER DEFAULT 0',
+                'overall_status': 'VARCHAR(50)',
+                'executed_by': 'VARCHAR(255)',
+                'notes': 'TEXT',
+                'created_at': 'TIMESTAMP'
+            },
+            'testcase_execution_stats': {
+                'traceability_id': 'VARCHAR(255)',
+                'execution_id': 'VARCHAR(255) PRIMARY KEY',
+                'sid': 'VARCHAR(255)',
+                'table_name': 'VARCHAR(255)',
+                'test_case_name': 'VARCHAR(255)',
+                'execution_start_time': 'TIMESTAMP',
+                'execution_end_time': 'TIMESTAMP',
+                'status': 'VARCHAR(50)',
+                'schema_validation_status': 'VARCHAR(50)',
+                'count_validation_status': 'VARCHAR(50)',
+                'data_validation_status': 'VARCHAR(50)',
+                'null_check_status': 'VARCHAR(50)',
+                'duplicate_check_status': 'VARCHAR(50)',
+                'rule_validation_status': 'VARCHAR(50)',
+                'source_count': 'INTEGER',
+                'target_count': 'INTEGER',
+                'mismatched_records': 'INTEGER',
+                'null_records': 'INTEGER',
+                'duplicate_records': 'INTEGER',
+                'error_message': 'TEXT',
+                'created_at': 'TIMESTAMP',
+                'parent_jira_ticket': 'VARCHAR(255)',
+                'test_plan_jira_ticket': 'VARCHAR(255)',
+                'environment': 'VARCHAR(50)',
+                'release_name': 'VARCHAR(255)',
+                'execution_run_id': 'VARCHAR(255)',
+                'format_versions': 'TEXT',
+                'source_type': 'VARCHAR(50)',
+                'source_version': 'VARCHAR(50)',
+                'source_module': 'VARCHAR(255)',
+                'target_type': 'VARCHAR(50)',
+                'target_version': 'VARCHAR(50)',
+                'target_module': 'VARCHAR(255)'
+            }
+        }
         
-        logger.info("Creating database tables if they don't exist")
+        # Create each table
+        for table_name, columns in tables.items():
+            create_table_if_not_exists(self.conn, table_name, columns)
         
-        # Testcase table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS testcase (
-            traceability_id TEXT PRIMARY KEY,
-            sid TEXT,
-            table_name TEXT,
-            test_case_name TEXT,
-            run_type TEXT,
-            source_type TEXT,
-            source_location TEXT,
-            source_partition_column TEXT,
-            source_partition_date TEXT,
-            source_copybook_location TEXT,
-            source_supporting_file TEXT,
-            is_multi_source INTEGER,
-            source_type_2 TEXT,
-            source_location_2 TEXT,
-            source_partition_column_2 TEXT,
-            source_partition_date_2 TEXT,
-            source_copybook_location_2 TEXT,
-            source_supporting_file_2 TEXT,
-            source_processor_enabled INTEGER,
-            source_processor_code TEXT,
-            schema_definition TEXT,
-            target_type TEXT,
-            target_location TEXT,
-            target_partition_column TEXT,
-            target_partition_date TEXT,
-            target_copybook_location TEXT,
-            target_supporting_file TEXT,
-            column_names TEXT,
-            execution_notes TEXT,
-            key_columns TEXT,
-            validation_types TEXT,
-            rules TEXT,
-            alert_rules TEXT,
-            parent_jira_ticket TEXT,
-            test_plan_jira_ticket TEXT,
-            environment TEXT,
-            release_name TEXT,
-            created_at TIMESTAMP,
-            updated_at TIMESTAMP,
-            format_versions TEXT  -- JSON string of format versions used
-        )
-        ''')
-        
-        # Execution Run table - tracks the entire execution with multiple test cases
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS execution_run (
-            execution_run_id TEXT PRIMARY KEY,
-            run_name TEXT,
-            start_time TIMESTAMP,
-            end_time TIMESTAMP,
-            total_test_cases INTEGER DEFAULT 0,
-            passed_test_cases INTEGER DEFAULT 0,
-            failed_test_cases INTEGER DEFAULT 0,
-            overall_status TEXT,
-            executed_by TEXT,
-            notes TEXT,
-            created_at TIMESTAMP
-        )
-        ''')
-        
-        # Testcase Execution Stats table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS testcase_execution_stats (
-            traceability_id TEXT,
-            execution_id TEXT PRIMARY KEY,
-            sid TEXT,
-            table_name TEXT,
-            test_case_name TEXT,
-            execution_start_time TIMESTAMP,
-            execution_end_time TIMESTAMP,
-            status TEXT,
-            schema_validation_status TEXT,
-            count_validation_status TEXT,
-            data_validation_status TEXT,
-            null_check_status TEXT,
-            duplicate_check_status TEXT,
-            rule_validation_status TEXT,
-            source_count INTEGER,
-            target_count INTEGER,
-            mismatched_records INTEGER,
-            null_records INTEGER,
-            duplicate_records INTEGER,
-            error_message TEXT,
-            created_at TIMESTAMP,
-            parent_jira_ticket TEXT,
-            test_plan_jira_ticket TEXT,
-            environment TEXT,
-            release_name TEXT,
-            execution_run_id TEXT,
-            format_versions TEXT,
-            source_type TEXT,
-            source_version TEXT,
-            source_module TEXT,
-            target_type TEXT,
-            target_version TEXT,
-            target_module TEXT,
-            FOREIGN KEY (traceability_id) REFERENCES testcase(traceability_id),
-            FOREIGN KEY (execution_run_id) REFERENCES execution_run(execution_run_id) ON DELETE SET NULL
-        )
-        ''')
-        
-        # Scheduler table for scheduled test cases
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS scheduler (
-            schedule_id TEXT PRIMARY KEY,
-            traceability_id TEXT,
-            yaml_file_path TEXT,
-            test_case_name TEXT,
-            sid TEXT,
-            table_name TEXT,
-            username TEXT,
-            frequency TEXT,
-            day_of_week INTEGER,
-            day_of_month INTEGER,
-            next_run_time TIMESTAMP,
-            last_run_time TIMESTAMP,
-            status TEXT,
-            enabled INTEGER DEFAULT 1,
-            created_at TIMESTAMP,
-            updated_at TIMESTAMP,
-            FOREIGN KEY (traceability_id) REFERENCES testcase(traceability_id)
-        )
-        ''')
-        
-        # Execution Log table for centralized logging
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS execution_log (
-            log_entry_id TEXT PRIMARY KEY,
-            execution_id TEXT,
-            timestamp TIMESTAMP,
-            level TEXT,
-            module TEXT,
-            function TEXT,
-            message TEXT,
-            error_details TEXT,
-            traceability_id TEXT,
-            execution_run_id TEXT,
-            test_case_name TEXT
-        )
-        ''')
-        
-        # Create log indexes
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_execution_log_execution_id ON execution_log(execution_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_execution_log_level ON execution_log(level)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_execution_log_timestamp ON execution_log(timestamp)')
-        
-        # Create version_fallback_decisions table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS version_fallback_decisions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            execution_id TEXT NOT NULL,
-            test_case_id TEXT NOT NULL,
-            traceability_id TEXT NOT NULL,
-            module_type TEXT NOT NULL,
-            operation_type TEXT NOT NULL,
-            initial_version TEXT NOT NULL,
-            fallback_version TEXT NOT NULL,
-            error_message TEXT,
-            decision_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            successful BOOLEAN NOT NULL,
-            format_type TEXT NOT NULL,
-            file_path TEXT,
-            user_id TEXT,
-            environment TEXT
-        )
-        ''')
-        
-        # Create module_execution_issues table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS module_execution_issues (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            execution_id TEXT NOT NULL,
-            test_case_id TEXT NOT NULL,
-            traceability_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            environment TEXT NOT NULL,
-            module_name TEXT NOT NULL,
-            module_type TEXT NOT NULL,
-            attempted_version TEXT NOT NULL,
-            framework_version TEXT NOT NULL,
-            tool_version TEXT,
-            plugin_version TEXT,
-            converter_version TEXT,
-            error_message TEXT NOT NULL,
-            stack_trace TEXT,
-            error_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            resolution_status TEXT DEFAULT 'PENDING',
-            resolution_notes TEXT,
-            file_path TEXT,
-            additional_context TEXT
-        )
-        ''')
-        
-        self.conn.commit()
         logger.info("Tables created successfully")
-    
+
     @function_logger
     def alter_tables(self):
         """Alter existing tables to add new columns if they don't exist."""
-        cursor = self.conn.cursor()
-        
-        # Check if format_versions column exists in testcase table
-        cursor.execute("PRAGMA table_info(testcase)")
-        columns = [col[1] for col in cursor.fetchall()]
-        
-        if 'format_versions' not in columns:
-            logger.info("Adding format_versions column to testcase table")
-            cursor.execute('ALTER TABLE testcase ADD COLUMN format_versions TEXT')
-            self.conn.commit()
-            logger.info("Successfully added format_versions column to testcase table")
-        
-        # Check if format_versions column exists in testcase_execution_stats table
-        cursor.execute("PRAGMA table_info(testcase_execution_stats)")
-        columns = [col[1] for col in cursor.fetchall()]
-        
-        if 'format_versions' not in columns:
-            logger.info("Adding format_versions column to testcase_execution_stats table")
-            cursor.execute('ALTER TABLE testcase_execution_stats ADD COLUMN format_versions TEXT')
-            self.conn.commit()
-            logger.info("Successfully added format_versions column to testcase_execution_stats table")
-
-        # Add new columns for source/target type, version, and module
-        new_columns = [
-            ('source_type', 'TEXT'),
-            ('source_version', 'TEXT'),
-            ('source_module', 'TEXT'),
-            ('target_type', 'TEXT'),
-            ('target_version', 'TEXT'),
-            ('target_module', 'TEXT'),
-        ]
-        for col_name, col_type in new_columns:
-            if col_name not in columns:
-                logger.info(f"Adding {col_name} column to testcase_execution_stats table")
-                cursor.execute(f'ALTER TABLE testcase_execution_stats ADD COLUMN {col_name} {col_type}')
+        if isinstance(self.conn, sqlite3.Connection):
+            cursor = self.conn.cursor()
+            
+            # Check if format_versions column exists in testcase table
+            cursor.execute("PRAGMA table_info(testcase)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            if 'format_versions' not in columns:
+                logger.info("Adding format_versions column to testcase table")
+                cursor.execute('ALTER TABLE testcase ADD COLUMN format_versions TEXT')
                 self.conn.commit()
-                logger.info(f"Successfully added {col_name} column to testcase_execution_stats table")
-    
+                logger.info("Successfully added format_versions column to testcase table")
+            
+            # Check if format_versions column exists in testcase_execution_stats table
+            cursor.execute("PRAGMA table_info(testcase_execution_stats)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            if 'format_versions' not in columns:
+                logger.info("Adding format_versions column to testcase_execution_stats table")
+                cursor.execute('ALTER TABLE testcase_execution_stats ADD COLUMN format_versions TEXT')
+                self.conn.commit()
+                logger.info("Successfully added format_versions column to testcase_execution_stats table")
+
+            # Add new columns for source/target type, version, and module
+            new_columns = [
+                ('source_type', 'TEXT'),
+                ('source_version', 'TEXT'),
+                ('source_module', 'TEXT'),
+                ('target_type', 'TEXT'),
+                ('target_version', 'TEXT'),
+                ('target_module', 'TEXT'),
+            ]
+            for col_name, col_type in new_columns:
+                if col_name not in columns:
+                    logger.info(f"Adding {col_name} column to testcase_execution_stats table")
+                    cursor.execute(f'ALTER TABLE testcase_execution_stats ADD COLUMN {col_name} {col_type}')
+                    self.conn.commit()
+                    logger.info(f"Successfully added {col_name} column to testcase_execution_stats table")
+        else:
+            # For SQL Server, we'll use Spark to alter tables
+            try:
+                # Add format_versions column to testcase table if it doesn't exist
+                if not self._column_exists('testcase', 'format_versions'):
+                    self.conn.sql("ALTER TABLE testcase ADD COLUMN format_versions TEXT")
+                    logger.info("Successfully added format_versions column to testcase table")
+                
+                # Add format_versions column to testcase_execution_stats table if it doesn't exist
+                if not self._column_exists('testcase_execution_stats', 'format_versions'):
+                    self.conn.sql("ALTER TABLE testcase_execution_stats ADD COLUMN format_versions TEXT")
+                    logger.info("Successfully added format_versions column to testcase_execution_stats table")
+                
+                # Add new columns for source/target type, version, and module
+                new_columns = [
+                    ('source_type', 'VARCHAR(50)'),
+                    ('source_version', 'VARCHAR(50)'),
+                    ('source_module', 'VARCHAR(255)'),
+                    ('target_type', 'VARCHAR(50)'),
+                    ('target_version', 'VARCHAR(50)'),
+                    ('target_module', 'VARCHAR(255)'),
+                ]
+                
+                for col_name, col_type in new_columns:
+                    if not self._column_exists('testcase_execution_stats', col_name):
+                        self.conn.sql(f"ALTER TABLE testcase_execution_stats ADD COLUMN {col_name} {col_type}")
+                        logger.info(f"Successfully added {col_name} column to testcase_execution_stats table")
+            except Exception as e:
+                logger.error(f"Error altering tables in SQL Server: {e}")
+                raise
+
+    def _column_exists(self, table_name: str, column_name: str) -> bool:
+        """Check if a column exists in a table."""
+        try:
+            if isinstance(self.conn, sqlite3.Connection):
+                cursor = self.conn.cursor()
+                cursor.execute(f"PRAGMA table_info({table_name})")
+                columns = [col[1] for col in cursor.fetchall()]
+                return column_name in columns
+            else:
+                # For SQL Server, use Spark to check column existence
+                df = self.conn.table(table_name)
+                return column_name in [field.name for field in df.schema.fields]
+        except Exception as e:
+            logger.error(f"Error checking column existence: {e}")
+            return False
+
     def generate_traceability_id(self):
         """Generate a unique traceability ID."""
         return generate_unique_id()
