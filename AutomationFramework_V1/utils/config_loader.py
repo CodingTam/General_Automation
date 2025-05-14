@@ -2,6 +2,19 @@ import os
 import yaml
 from typing import Dict
 
+def load_config(config_path: str = None) -> Dict:
+    """Load the framework configuration from the specified path or default location."""
+    if config_path is None:
+        # Get the root directory of the framework
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_path = os.path.join(root_dir, 'configs', 'framework_config.yaml')
+
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Framework configuration file not found at: {config_path}")
+
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
 class ConfigLoader:
     _instance = None
     _config = None

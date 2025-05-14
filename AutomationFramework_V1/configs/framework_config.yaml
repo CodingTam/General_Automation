@@ -1,37 +1,26 @@
-# Framework Configuration
-# This file contains all framework-related configuration settings
-
-# Database connection settings
 database:
-  # SQLite (DB1) Configuration
   db1:
-    path: "data/framework.db"  # Relative path to the SQLite database
-    backup_dir: "data/backups"  # Directory for database backups
+    backup_dir: data/backups
     max_connections: 10
-    timeout: 30  # Connection timeout in seconds
-    max_retries: 3  # Maximum number of retries for database operations
-
-  # SQL Server (DB2) Configuration
-  db2:
-    server: "your_server_name"  # SQL Server hostname or IP
-    port: 1433  # SQL Server port
-    database: "your_database_name"  # Database name
-    username: "your_username"  # SQL Server username
-    password: "your_password"  # SQL Server password
-    driver: "com.microsoft.sqlserver.jdbc.SQLServerDriver"  # JDBC driver class
-    jdbc_url: "jdbc:sqlserver://{server}:{port};databaseName={database};encrypt=true;trustServerCertificate=true"
-    max_connections: 10
-    timeout: 30
     max_retries: 3
-
-  # Active database selection
-  db2use: "db1"  # Options: "db1" for SQLite, "SQL" for SQL Server
-
-# Framework settings
+    path: data/framework.db
+    timeout: 30
+  db2:
+    database: your_database_name
+    driver: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    jdbc_url: jdbc:sqlserver://{server}:{port};databaseName={database};encrypt=true;trustServerCertificate=true
+    max_connections: 10
+    max_retries: 3
+    password: your_password
+    port: 1433
+    server: your_server_name
+    timeout: 30
+    username: your_username
+  db2use: db1
 framework:
-  version: "1.0.0"
-  environment: "development"
-  log_level: "INFO"
-  log_file: "logs/framework.log"
-  temp_dir: "temp"
-  output_dir: "output"
+  environment: development
+  log_file: logs/framework.log
+  log_level: INFO
+  output_dir: output
+  temp_dir: temp
+  version: 1.0.0

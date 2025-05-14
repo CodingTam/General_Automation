@@ -1,9 +1,9 @@
 import logging
 import sys
-from utils.db_utils import load_config
-import yaml
-from pyspark.sql import SparkSession
 import os
+import pyodbc
+from utils.config_loader import load_config
+import yaml
 
 # Configure logging
 logging.basicConfig(
@@ -12,18 +12,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def check_spark_dependencies():
-    """Check if Spark and JDBC driver are available."""
+def check_sql_server_dependencies():
+    """Check if SQL Server ODBC driver is available."""
     try:
-        # Check if JDBC driver exists
-        jdbc_path = 'drivers/mssql-jdbc-12.6.2.jre11.jar'
-        if not os.path.exists(jdbc_path):
-            logger.error(f"JDBC driver not found at {jdbc_path}")
-            logger.error("Please ensure mssql-jdbc-12.6.2.jre11.jar is in the drivers directory")
+        # Check if ODBC driver is installed
+        drivers = pyodbc.drivers()
+        if not any('SQL Server' in driver for driver in drivers):
+            logger.error("SQL Server ODBC driver not found")
+            logger.error("Please install ODBC Driver 17 for SQL Server")
             return False
         return True
     except Exception as e:
-        logger.error(f"Error checking Spark dependencies: {e}")
+        logger.error(f"Error checking SQL Server dependencies: {e}")
         return False
 
 def test_connection():
@@ -34,7 +34,7 @@ def test_connection():
         current_db = config.get('db2use', 'db1')
         logger.info(f"Testing connection for database: {current_db}")
 
-        if current_db.upper() == 'SQL' and not check_spark_dependencies():
+        if current_db.upper() == 'SQL' and not check_sql_server_dependencies():
             logger.error("Cannot test SQL Server connection due to missing dependencies")
             return
 
@@ -45,21 +45,13 @@ def test_connection():
         conn = get_db_connection()
         
         if current_db.upper() == 'SQL':
-            # SQL Server test query through Spark
-            df = conn.read \
-                .format("jdbc") \
-                .option("url", f"jdbc:sqlserver://{config['db2']['hostname']}:{config['db2']['port']};databaseName={config['db2']['database']}") \
-                .option("user", config['db2']['username']) \
-                .option("password", config['db2']['password']) \
-                .option("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver") \
-                .option("query", "SELECT @@version as version") \
-                .load()
-            
-            version = df.first()['version']
+            # SQL Server test query
+            cursor = conn.cursor()
+            cursor.execute("SELECT @@version as version")
+            version = cursor.fetchone()[0]
             logger.info(f"Successfully connected to SQL Server. Version: {version}")
-            
-            # Stop SparkSession
-            conn.stop()
+            cursor.close()
+            conn.close()
         else:
             # SQLite test query
             cursor = conn.cursor()
@@ -77,8 +69,8 @@ def test_connection():
 
 def test_both_connections():
     """Test both database connections by temporarily modifying the configuration."""
-    if not check_spark_dependencies():
-        logger.error("Cannot test both connections due to missing Spark dependencies")
+    if not check_sql_server_dependencies():
+        logger.error("Cannot test both connections due to missing SQL Server dependencies")
         return
 
     original_config = load_config()

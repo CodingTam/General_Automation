@@ -1,33 +1,30 @@
 import os
 import yaml
 import sqlite3
+import pyodbc
 from pyspark.sql import SparkSession
 from typing import Union, Dict, Any
 import logging
+from utils.logger import logger
+from utils.config_loader import load_config
 
 logger = logging.getLogger(__name__)
 
-def load_config() -> Dict[str, Any]:
-    """Load framework configuration from YAML file."""
-    config_path = os.path.join('configs', 'framework_config.yaml')
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
-
-def get_db_connection() -> Union[sqlite3.Connection, SparkSession]:
+def get_db_connection() -> Union[sqlite3.Connection, pyodbc.Connection]:
     """
     Get database connection based on configuration.
-    Returns either SQLite connection or SparkSession based on db2use setting.
+    Returns either SQLite connection or SQL Server connection based on db2use setting.
     
     The db2use setting can be:
     - "db1": Use SQLite database (default)
-    - "SQL": Use SQL Server database through Spark
+    - "SQL": Use SQL Server database through pyodbc
     """
     config = load_config()
     db_config = config['database']
     db2use = db_config.get('db2use', 'db1').upper()
 
     if db2use == 'SQL':
-        logger.info("Using SQL Server database (db2) through Spark")
+        logger.info("Using SQL Server database (db2) through pyodbc")
         return get_sql_server_connection(db_config['db2'])
     else:
         logger.info("Using SQLite database (db1)")
@@ -43,20 +40,21 @@ def get_sqlite_connection(db_config: Dict[str, Any]) -> sqlite3.Connection:
         logger.error(f"Error connecting to SQLite database: {e}")
         raise
 
-def get_sql_server_connection(db_config: Dict[str, Any]) -> SparkSession:
-    """Create and return SparkSession configured for SQL Server connection."""
+def get_sql_server_connection(db_config: Dict[str, Any]) -> pyodbc.Connection:
+    """Create and return pyodbc connection for SQL Server."""
     try:
-        # Create SparkSession with SQL Server JDBC configuration
-        spark = (SparkSession.builder
-                .appName("SQLServerConnection")
-                .config("spark.jars", "drivers/mssql-jdbc-12.6.2.jre11.jar")
-                .config("spark.driver.extraClassPath", "drivers/mssql-jdbc-12.6.2.jre11.jar")
-                .getOrCreate())
-        
-        logger.info("Successfully created SparkSession for SQL Server")
-        return spark
-    except Exception as e:
-        logger.error(f"Error creating SparkSession for SQL Server: {e}")
+        conn_str = (
+            "DRIVER={ODBC Driver 17 for SQL Server};"
+            f"SERVER={db_config['hostname']},{db_config['port']};"
+            f"DATABASE={db_config['database']};"
+            f"UID={db_config['username']};"
+            f"PWD={db_config['password']}"
+        )
+        conn = pyodbc.connect(conn_str)
+        logger.info("Successfully connected to SQL Server database")
+        return conn
+    except pyodbc.Error as e:
+        logger.error(f"Error connecting to SQL Server database: {e}")
         raise
 
 def create_table_if_not_exists(conn: Union[sqlite3.Connection, SparkSession], 
