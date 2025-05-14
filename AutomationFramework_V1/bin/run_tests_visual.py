@@ -459,91 +459,60 @@ def execute_test_case(test_file, execution_run_id=None):
             
             # Track the actual test result from each line
             for pattern in failure_patterns:
-                if pattern in line.lower():
-                    test_result = "FAILED"
+                if pattern.lower() in line.lower():
                     validation_errors_detected = True
-                    if DEBUG:
-                        print(f"\n{RED}DEBUG: Test FAILED detected in logs: '{pattern}'{NC}")
-                    break
-                    
-            for pattern in success_patterns:
-                # Only mark as passed if no failures detected yet
-                if pattern in line.lower() and not validation_errors_detected:
-                    test_result = "PASSED"
-                    if DEBUG:
-                        print(f"\n{GREEN}DEBUG: Test PASSED detected in logs: '{pattern}'{NC}")
+                    test_result = "FAILED"
                     break
             
-            # Enhanced pattern matching for each stage
-            for stage_index, patterns in enumerate(stage_patterns):
-                # Only check for stages we haven't reached yet or are currently on
-                if stage_index <= current_stage:
-                    for pattern in patterns:
-                        if pattern in line.lower():
-                            # If we find a pattern for the current stage, mark it complete and advance
-                            if stage_index == current_stage:
-                                stages_status[current_stage] = "COMPLETE"
-                                current_stage += 1
-                                if current_stage < len(STAGES):
-                                    stages_status[current_stage] = "ACTIVE"
-                                    stage_start_times[current_stage] = time.time()
-                                if DEBUG:
-                                    print(f"\n{GREEN}DEBUG: Advanced to stage {current_stage}: {STAGES[current_stage] if current_stage < len(STAGES) else 'Complete'}{NC}")
-                                break
-                            # If we find a pattern for an earlier stage that hasn't been marked complete, mark it now
-                            elif stages_status.get(stage_index) != "COMPLETE":
-                                stages_status[stage_index] = "COMPLETE"
-                                if DEBUG:
-                                    print(f"\n{GREEN}DEBUG: Retroactively completed stage {stage_index}: {STAGES[stage_index]}{NC}")
+            if not validation_errors_detected:
+                for pattern in success_patterns:
+                    if pattern.lower() in line.lower():
+                        test_result = "PASSED"
+                        break
             
-            # Only refresh the display a maximum of 5 times per second
-            current_time = time.time()
-            if current_time - last_update_time > 0.2:
-                last_update_time = current_time
-                
-                # Check if current stage has been active for too long and should auto-advance
-                if current_stage < len(STAGES) and not forced_stage_progression:
-                    stage_elapsed = current_time - stage_start_times[current_stage]
-                    
-                    # Auto-advance if we've been on this stage too long
-                    if stage_elapsed > stage_timeouts[current_stage]:
-                        # If we've spent enough time on this stage, move to next
+            # Check for stage progression
+            for i, patterns in enumerate(stage_patterns):
+                if any(pattern.lower() in line.lower() for pattern in patterns):
+                    if i > current_stage:
+                        # Mark current stage as complete and move to next
                         stages_status[current_stage] = "COMPLETE"
-                        current_stage += 1
-                        
-                        # Don't auto-advance beyond available stages
-                        if current_stage < len(STAGES):
-                            stages_status[current_stage] = "ACTIVE"
-                            stage_start_times[current_stage] = current_time
-                            if DEBUG:
-                                print(f"\n{YELLOW}DEBUG: Auto-advanced to stage {current_stage}: {STAGES[current_stage]} (timeout after {stage_elapsed:.1f}s){NC}")
-                
-                # Check if we've had no new content for a while - force stage progression if needed
-                if current_stage < len(STAGES) - 1 and not forced_stage_progression:  # Don't force Jira stage
-                    content_elapsed = current_time - no_new_content_time
-                    if content_elapsed > content_timeout:
-                        force_stage_progression()
-                        no_new_content_time = current_time  # Reset timer
-                
-                # Show warning about slow progress if test seems stuck
-                if current_stage < 4 and current_time - stage_start_times[0] > 15 and show_progress_warning:
-                    print(f"\n{YELLOW}Warning: Test execution seems slow. Stages may be auto-advancing due to timeout.{NC}")
-                    show_progress_warning = False  # Only show this once
-                
-                # Redraw everything
-                clear_screen()
-                print(f"{CYAN}Executing Test Case: {test_case_name}{NC}")
-                print(f"{CYAN}File: {test_file}{NC}")
-                draw_progress_flow(test_case_name, current_stage, stages_status, test_result)
-                print(f"\n{YELLOW}Latest Output:{NC}")
-                print(f"{YELLOW}{'─' * 60}{NC}")
-                
-                # Display output lines or a message if no output
-                if output_lines:
-                    for output_line in output_lines:
-                        print(output_line)
-                else:
-                    print(f"{CYAN}Waiting for output...{NC}")
+                        current_stage = i
+                        stages_status[current_stage] = "ACTIVE"
+                        stage_start_times[current_stage] = time.time()
+                        if DEBUG:
+                            print(f"\n{BLUE}DEBUG: Advanced to stage {current_stage}: {STAGES[current_stage]}{NC}")
+                    break
+            
+            # Check for stage timeouts
+            current_time = time.time()
+            if current_stage < len(STAGES):
+                stage_duration = current_time - stage_start_times[current_stage]
+                if stage_duration > stage_timeouts[current_stage]:
+                    force_stage_progression()
+            
+            # Check for content timeout
+            if current_time - no_new_content_time > content_timeout:
+                force_stage_progression()
+            
+            # Show warning about slow progress if test seems stuck
+            if current_stage < 4 and current_time - stage_start_times[0] > 15 and show_progress_warning:
+                print(f"\n{YELLOW}Warning: Test execution seems slow. Stages may be auto-advancing due to timeout.{NC}")
+                show_progress_warning = False  # Only show this once
+            
+            # Redraw everything
+            clear_screen()
+            print(f"{CYAN}Executing Test Case: {test_case_name}{NC}")
+            print(f"{CYAN}File: {test_file}{NC}")
+            draw_progress_flow(test_case_name, current_stage, stages_status, test_result)
+            print(f"\n{YELLOW}Latest Output:{NC}")
+            print(f"{YELLOW}{'─' * 60}{NC}")
+            
+            # Display output lines or a message if no output
+            if output_lines:
+                for output_line in output_lines:
+                    print(output_line)
+            else:
+                print(f"{CYAN}Waiting for output...{NC}")
         
         # Wait for process to complete
         process.wait()
@@ -562,67 +531,54 @@ def execute_test_case(test_file, execution_run_id=None):
         # Final stage
         current_stage = len(STAGES)
         
-        # Final analysis of full output for test result determination
-        # First, check if any validation errors were detected during execution
-        if validation_errors_detected:
-            test_result = "FAILED"
-        else:
-            # Use the specialized parser to extract result from summary
-            summary_result = parse_test_summary(all_output)
-            if summary_result != "UNKNOWN":
-                test_result = summary_result
-            elif test_result == "UNKNOWN":
-                # If still unknown, use the process exit code
-                test_result = "PASSED" if process.returncode == 0 else "FAILED"
+        # Check database for final status
+        try:
+            import sqlite3
+            from utils.db_config import db_config
+            
+            conn = sqlite3.connect(db_config.database_path)
+            cursor = conn.cursor()
+            
+            # Get the most recent execution status for this test case
+            cursor.execute("""
+                SELECT status 
+                FROM testcase_execution_stats 
+                WHERE test_case_name = ? 
+                ORDER BY execution_start_time DESC 
+                LIMIT 1
+            """, (test_case_name,))
+            
+            result = cursor.fetchone()
+            if result:
+                db_status = result[0]
+                if db_status == "PASS":
+                    test_result = "PASSED"
+                elif db_status in ["FAIL", "FAILED"]:
+                    test_result = "FAILED"
+            
+            conn.close()
+        except Exception as e:
+            if DEBUG:
+                print(f"\n{RED}Error checking database status: {e}{NC}")
         
-        # FORCE DETECTION: Only force FAILED if we see specific error patterns
-        if test_result == "PASSED":
-            last_chunk = "\n".join(all_output[-50:]).lower()
-            # Only force FAILED if we see actual error messages, not just keywords
-            if (("error:" in last_chunk or "exception:" in last_chunk) and 
-                ("fail" in last_chunk or "error" in last_chunk or "exception" in last_chunk)):
-                test_result = "FAILED"
-                if DEBUG:
-                    print(f"\n{RED}DEBUG: Forced FAILED result due to error messages in final output{NC}")
-        
-        # Final display
+        # Final display update
         clear_screen()
-        print(f"{CYAN}Completed Test Case: {test_case_name}{NC}")
+        print(f"{CYAN}Executing Test Case: {test_case_name}{NC}")
         print(f"{CYAN}File: {test_file}{NC}")
-        
-        # Set the color based on result
-        result_color = GREEN if test_result == "PASSED" else RED
-        print(f"{CYAN}Result: {result_color}{test_result}{NC}")
-        
         draw_progress_flow(test_case_name, current_stage, stages_status, test_result)
-        
-        # Show final output
-        print(f"\n{YELLOW}Latest Output:{NC}")
+        print(f"\n{YELLOW}Final Output:{NC}")
         print(f"{YELLOW}{'─' * 60}{NC}")
         
-        # Display output lines or completion message if no output
-        if output_lines:
-            for output_line in output_lines:
-                print(output_line)
-        else:
-            print(f"{GREEN}Test completed successfully.{NC}")
-            print(f"{CYAN}No output available to display.{NC}")
-        
-        # Add debug info if needed
-        if DEBUG:
-            print(f"\n{YELLOW}DEBUG: Final determination based on:")
-            print(f"  - Validation errors during execution: {validation_errors_detected}")
-            print(f"  - Test summary parser result: {parse_test_summary(all_output)}")
-            print(f"  - Process exit code: {process.returncode}")
-            print(f"  - Final result: {test_result}{NC}")
+        # Show final output
+        for output_line in output_lines:
+            print(output_line)
         
         return test_result
-            
+        
     except Exception as e:
-        print(f"{RED}Error executing test case: {str(e)}{NC}")
-        if current_stage < len(STAGES):
-            stages_status[current_stage] = "FAIL"
-        return "FAILED"
+        print(f"\n{RED}Error executing test case: {e}{NC}")
+        test_result = "FAILED"
+        return test_result
 
 def draw_execution_flow_summary(results):
     """Draw a flow diagram summary of all test executions."""
