@@ -2,7 +2,6 @@ import os
 import yaml
 import sqlite3
 import jaydebeapi
-from pyspark.sql import SparkSession
 from typing import Union, Dict, Any
 import logging
 from utils.logger import logger
@@ -61,7 +60,7 @@ def get_sql_server_connection(db_config: Dict[str, Any]) -> jaydebeapi.Connectio
         logger.error(f"Error connecting to SQL Server database: {e}")
         raise
 
-def create_table_if_not_exists(conn: Union[sqlite3.Connection, SparkSession], 
+def create_table_if_not_exists(conn: Union[sqlite3.Connection, Any], 
                              table_name: str, 
                              columns: Dict[str, str]) -> None:
     """
@@ -92,8 +91,13 @@ def create_table_if_not_exists(conn: Union[sqlite3.Connection, SparkSession],
         finally:
             cursor.close()
     else:
-        # SQL Server table creation through Spark
+        # Check if this is a Spark session
         try:
+            from pyspark.sql import SparkSession
+            if not isinstance(conn, SparkSession):
+                raise TypeError("Connection must be either SQLite connection or SparkSession")
+                
+            # SQL Server table creation through Spark
             sql_config = db_config['db2']
             jdbc_url = sql_config['jdbc_url'].format(
                 server=sql_config['server'],
@@ -131,11 +135,14 @@ def create_table_if_not_exists(conn: Union[sqlite3.Connection, SparkSession],
                 .save()
             
             logger.info(f"Table {table_name} created or already exists in SQL Server")
+        except ImportError:
+            logger.error("PySpark is not installed. Spark functionality is not available.")
+            raise
         except Exception as e:
             logger.error(f"Error creating table {table_name} in SQL Server: {e}")
             raise
 
-def insert_data(conn: Union[sqlite3.Connection, SparkSession],
+def insert_data(conn: Union[sqlite3.Connection, Any],
                 table_name: str,
                 data: list,
                 columns: list) -> None:
@@ -168,8 +175,13 @@ def insert_data(conn: Union[sqlite3.Connection, SparkSession],
         finally:
             cursor.close()
     else:
-        # SQL Server data insertion through Spark
+        # Check if this is a Spark session
         try:
+            from pyspark.sql import SparkSession
+            if not isinstance(conn, SparkSession):
+                raise TypeError("Connection must be either SQLite connection or SparkSession")
+                
+            # SQL Server data insertion through Spark
             sql_config = db_config['db2']
             jdbc_url = sql_config['jdbc_url'].format(
                 server=sql_config['server'],
@@ -194,6 +206,9 @@ def insert_data(conn: Union[sqlite3.Connection, SparkSession],
                 .save()
             
             logger.info(f"Successfully inserted {len(data)} rows into SQL Server table {table_name}")
+        except ImportError:
+            logger.error("PySpark is not installed. Spark functionality is not available.")
+            raise
         except Exception as e:
             logger.error(f"Error inserting data into SQL Server table {table_name}: {e}")
             raise 
