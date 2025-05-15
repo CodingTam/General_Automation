@@ -48,17 +48,14 @@ def execute_command(command):
 
 # ===== Scheduler Commands =====
 
-def add_to_scheduler(traceability_id, interval, time, day=None, date=None, description=None, force=False):
+def add_to_scheduler(yaml_file, frequency="daily", day_of_week=None, day_of_month=None, force=False):
     """Add a test to the scheduler."""
-    command = f"python run_scheduler.py --add --traceability_id {traceability_id} --interval {interval} --time {time}"
+    command = f"python3 bin/add_to_scheduler.py {yaml_file} --frequency {frequency}"
     
-    if interval.lower() == "weekly" and day:
-        command += f" --day {day}"
-    elif interval.lower() == "monthly" and date:
-        command += f" --date {date}"
-    
-    if description:
-        command += f" --description \"{description}\""
+    if frequency.lower() == "weekly" and day_of_week:
+        command += f" --day-of-week {day_of_week}"
+    elif frequency.lower() == "monthly" and day_of_month:
+        command += f" --day-of-month {day_of_month}"
     
     if force:
         command += " --force"
@@ -68,7 +65,7 @@ def add_to_scheduler(traceability_id, interval, time, day=None, date=None, descr
 
 def add_yaml_to_scheduler(yaml_file):
     """Add a test to the scheduler directly from a YAML file."""
-    command = f"python add_to_scheduler.py {yaml_file}"
+    command = f"python3 bin/add_to_scheduler.py {yaml_file}"
     
     print_command(command, f"Adding test from YAML file to scheduler: {yaml_file}")
     return execute_command(command)

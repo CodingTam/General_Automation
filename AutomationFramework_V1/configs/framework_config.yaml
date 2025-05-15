@@ -1,11 +1,16 @@
+user:
+  role: tester  # or 'tester' #developer / tester
+
 database:
   db1:
+    type: sqlite
     backup_dir: data/backups
     max_connections: 10
     max_retries: 3
     path: data/framework.db
     timeout: 30
   db2:
+    type: sqlserver
     database: your_database_name
     driver: com.microsoft.sqlserver.jdbc.SQLServerDriver
     jdbc_url: jdbc:sqlserver://{server}:{port};databaseName={database};encrypt=true;trustServerCertificate=true
@@ -16,6 +21,13 @@ database:
     server: your_server_name
     timeout: 30
     username: your_username
+  db3:
+    type: sqlite
+    backup_dir: data/backups
+    max_connections: 10
+    max_retries: 3
+    path: data/demo.db
+    timeout: 30
   db2use: db1
 framework:
   environment: development

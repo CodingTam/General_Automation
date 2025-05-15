@@ -4,30 +4,128 @@ import sqlite3
 import jaydebeapi
 from typing import Union, Dict, Any
 import logging
-from utils.logger import logger
-from utils.config_loader import load_config
+from utils.config_loader import config
 
+# Configure module logger
 logger = logging.getLogger(__name__)
+
+def create_required_tables(conn: Union[sqlite3.Connection, jaydebeapi.Connection]) -> None:
+    """Create all required tables if they don't exist."""
+    cursor = conn.cursor()
+    
+    # Create scheduler table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS scheduler (
+        schedule_id TEXT PRIMARY KEY,
+        traceability_id TEXT,
+        yaml_file_path TEXT,
+        test_case_name TEXT,
+        sid TEXT,
+        table_name TEXT,
+        username TEXT,
+        frequency TEXT,
+        day_of_week INTEGER,
+        day_of_month INTEGER,
+        next_run_time TIMESTAMP,
+        last_run_time TIMESTAMP,
+        status TEXT,
+        enabled INTEGER DEFAULT 1,
+        created_at TIMESTAMP,
+        updated_at TIMESTAMP,
+        FOREIGN KEY (traceability_id) REFERENCES testcase(traceability_id)
+    )
+    ''')
+    
+    # Create module_execution_issues table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS module_execution_issues (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        execution_id TEXT NOT NULL,
+        test_case_id TEXT NOT NULL,
+        traceability_id TEXT,
+        user_id TEXT,
+        environment TEXT,
+        module_name TEXT NOT NULL,
+        module_type TEXT NOT NULL,
+        attempted_version TEXT,
+        framework_version TEXT,
+        tool_version TEXT,
+        plugin_version TEXT,
+        converter_version TEXT,
+        error_message TEXT,
+        stack_trace TEXT,
+        file_path TEXT,
+        additional_context TEXT,
+        resolution_status TEXT DEFAULT 'OPEN',
+        resolution_notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    # Create version_fallback_decisions table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS version_fallback_decisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        execution_id TEXT NOT NULL,
+        test_case_id TEXT NOT NULL,
+        traceability_id TEXT,
+        module_type TEXT NOT NULL,
+        operation_type TEXT NOT NULL,
+        initial_version TEXT NOT NULL,
+        fallback_version TEXT NOT NULL,
+        error_message TEXT,
+        successful BOOLEAN NOT NULL,
+        format_type TEXT,
+        file_path TEXT,
+        user_id TEXT,
+        environment TEXT,
+        decision_timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    conn.commit()
+    logger.info("All required tables have been created")
 
 def get_db_connection() -> Union[sqlite3.Connection, jaydebeapi.Connection]:
     """
     Get database connection based on configuration.
-    Returns either SQLite connection or SQL Server connection based on db2use setting.
+    Returns either SQLite connection or SQL Server connection based on db2use setting and database type.
     
-    The db2use setting can be:
-    - "db1": Use SQLite database (default)
-    - "SQL": Use SQL Server database through jaydebeapi
+    The db2use setting specifies which database configuration to use.
+    Each database configuration has a 'type' field that can be:
+    - "sqlite": Use SQLite database
+    - "sqlserver": Use SQL Server database through jaydebeapi
     """
-    config = load_config()
-    db_config = config['database']
-    db2use = db_config.get('db2use', 'db1').upper()
+    config_data = config.config  # Use the config property to get the dictionary
+    db_config = config_data['database']
+    db2use = db_config.get('db2use', 'db1').lower()
+    
+    # Get the selected database configuration
+    selected_db = db_config.get(db2use, db_config['db1'])
+    db_type = selected_db.get('type', 'sqlite').lower()  # Default to sqlite if type not specified
 
-    if db2use == 'SQL':
-        logger.info("Using SQL Server database (db2) through jaydebeapi")
-        return get_sql_server_connection(db_config['db2'])
-    else:
-        logger.info("Using SQLite database (db1)")
-        return get_sqlite_connection(db_config['db1'])
+    logger.info(f"Database selected from config: {db2use}")
+    logger.info(f"Using {'SQL Server (DB2)' if db2use == 'db2' else 'SQLite (DB1)'}")
+
+    if db_type == 'sqlserver':
+        try:
+            conn = get_sql_server_connection(selected_db)
+            logger.info(f"Connection object type: {type(conn)}")
+            return conn
+        except Exception as e:
+            logger.error(f"Failed to connect to DB2: {e}")
+            raise RuntimeError("Cannot continue. Check DB2 settings or fallback logic.")
+    else:  # sqlite or any other type defaults to SQLite
+        conn = get_sqlite_connection(selected_db)
+        logger.info(f"Connection object type: {type(conn)}")
+        
+        # Enable foreign key constraints for SQLite
+        if isinstance(conn, sqlite3.Connection):
+            conn.execute("PRAGMA foreign_keys = ON")
+    
+    # Create required tables
+    create_required_tables(conn)
+    return conn
 
 def get_sqlite_connection(db_config: Dict[str, Any]) -> sqlite3.Connection:
     """Create and return SQLite connection."""
@@ -42,7 +140,7 @@ def get_sqlite_connection(db_config: Dict[str, Any]) -> sqlite3.Connection:
 def get_sql_server_connection(db_config: Dict[str, Any]) -> jaydebeapi.Connection:
     """Create and return jaydebeapi connection for SQL Server."""
     try:
-        jdbc_url = f"jdbc:sqlserver://{db_config['hostname']}:{db_config['port']};databaseName={db_config['database']}"
+        jdbc_url = f"jdbc:sqlserver://{db_config['server']}:{db_config['port']};databaseName={db_config['database']}"
         jar_path = os.path.join('drivers', 'mssql-jdbc-12.6.2.jre11.jar')
         
         if not os.path.exists(jar_path):
@@ -71,11 +169,12 @@ def create_table_if_not_exists(conn: Union[sqlite3.Connection, Any],
         table_name: Name of the table to create
         columns: Dictionary of column names and their SQL types
     """
-    config = load_config()
-    db_config = config['database']
+    config_data = config.config  # Use the config property to get the dictionary
+    db_config = config_data['database']
+    db2use = db_config.get('db2use', 'db1').lower()
     
     if isinstance(conn, sqlite3.Connection):
-        # SQLite table creation
+        # SQLite table creation (for both db1 and db3)
         column_defs = [f"{col_name} {col_type}" for col_name, col_type in columns.items()]
         columns_str = ", ".join(column_defs)
         create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({columns_str})"
@@ -98,7 +197,7 @@ def create_table_if_not_exists(conn: Union[sqlite3.Connection, Any],
                 raise TypeError("Connection must be either SQLite connection or SparkSession")
                 
             # SQL Server table creation through Spark
-            sql_config = db_config['db2']
+            sql_config = db_config['db2']  # Only db2 uses SQL Server
             jdbc_url = sql_config['jdbc_url'].format(
                 server=sql_config['server'],
                 port=sql_config['port'],
@@ -155,11 +254,12 @@ def insert_data(conn: Union[sqlite3.Connection, Any],
         data: List of tuples containing the data to insert
         columns: List of column names
     """
-    config = load_config()
-    db_config = config['database']
+    config_data = config.config  # Use the config property to get the dictionary
+    db_config = config_data['database']
+    db2use = db_config.get('db2use', 'db1').lower()
     
     if isinstance(conn, sqlite3.Connection):
-        # SQLite data insertion
+        # SQLite data insertion (for both db1 and db3)
         placeholders = ", ".join(["?" for _ in columns])
         columns_str = ", ".join(columns)
         insert_sql = f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders})"
@@ -182,7 +282,7 @@ def insert_data(conn: Union[sqlite3.Connection, Any],
                 raise TypeError("Connection must be either SQLite connection or SparkSession")
                 
             # SQL Server data insertion through Spark
-            sql_config = db_config['db2']
+            sql_config = db_config['db2']  # Only db2 uses SQL Server
             jdbc_url = sql_config['jdbc_url'].format(
                 server=sql_config['server'],
                 port=sql_config['port'],

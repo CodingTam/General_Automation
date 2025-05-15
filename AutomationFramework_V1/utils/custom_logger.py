@@ -9,6 +9,7 @@ import uuid
 from typing import Optional, Dict, Any
 from .config_loader import config
 from .db_config import db_config
+from .db_utils import get_db_connection
 
 # Configuration option to store all logs in the database
 STORE_ALL_LOGS_IN_DB = os.environ.get('STORE_ALL_LOGS_IN_DB', 'true').lower() == 'true'
@@ -19,7 +20,6 @@ class CustomLogger:
     def __init__(self, name: str):
         """Initialize custom logger with database configuration"""
         self.name = name
-        self.db_path = db_config.database_path
         self._setup_logger()
 
     def _setup_logger(self):
@@ -35,7 +35,7 @@ class CustomLogger:
         self.logger.addHandler(console_handler)
         
         # Add database handler
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = get_db_connection()
         self._ensure_log_table()
 
     def _ensure_log_table(self):

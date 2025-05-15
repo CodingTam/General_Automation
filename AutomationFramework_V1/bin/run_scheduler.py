@@ -111,7 +111,7 @@ def run_test_case(yaml_file_path, traceability_id=None, schedule_id=None):
     try:
         # Use sys.executable to get the current Python interpreter path
         # Pass --scheduled flag to prevent processing all test cases
-        cmd = [sys.executable, 'run_test_cases.py', yaml_file_path, '--scheduled']
+        cmd = [sys.executable, 'bin/run_test_cases.py', yaml_file_path, '--scheduled']
         
         # Add traceability_id if provided
         if traceability_id:

@@ -7,14 +7,12 @@ import uuid
 from .config_loader import config
 from typing import Optional
 from .db_config import db_config
-
-# Path to the database
-DB_PATH = "/Users/tamilarasanrajendran/Documents/01.Projects/SQLITE/DATABASES/automation.db"
+from .db_utils import get_db_connection
 
 def connect_db() -> Optional[sqlite3.Connection]:
     """Connect to database using configuration"""
     try:
-        conn = sqlite3.connect(db_config.database_path)
+        conn = get_db_connection()
         return conn
     except Exception as e:
         print(f"Error connecting to database: {e}")

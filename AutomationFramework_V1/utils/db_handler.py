@@ -19,7 +19,7 @@ from utils.validation import (
 from .config_loader import config
 from .db_config import db_config
 from .db_utils import get_db_connection, create_table_if_not_exists, insert_data
-from pyspark.sql import SparkSession
+#from pyspark.sql import SparkSession
 
 class DBHandler:
     """Handler for database operations"""

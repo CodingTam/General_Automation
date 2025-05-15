@@ -14,6 +14,7 @@ import yaml
 import subprocess
 import argparse
 from datetime import datetime
+from utils.db_utils import get_db_connection
 
 # Global debug flag
 DEBUG = False
@@ -533,10 +534,7 @@ def execute_test_case(test_file, execution_run_id=None):
         
         # Check database for final status
         try:
-            import sqlite3
-            from utils.db_config import db_config
-            
-            conn = sqlite3.connect(db_config.database_path)
+            conn = get_db_connection()
             cursor = conn.cursor()
             
             # Get the most recent execution status for this test case
@@ -772,6 +770,17 @@ def parse_test_summary(output_lines):
             
     # If no clear indicators found
     return 'UNKNOWN'
+
+def update_test_results():
+    """Update test results in the database"""
+    try:
+        conn = get_db_connection()
+        # ... rest of the function ...
+    except Exception as e:
+        print(f"Error updating test results: {e}")
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 if __name__ == "__main__":
     main() 

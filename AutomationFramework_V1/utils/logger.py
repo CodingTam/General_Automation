@@ -4,12 +4,13 @@ import os
 import sqlite3
 import uuid
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from utils.common import ensure_directory_exists, get_timestamp
 from .config_loader import config
 import inspect
 from datetime import datetime
 from .db_config import db_config
+import jaydebeapi
 
 class SensitiveDataFilter:
     """Filter to sanitize sensitive data from log messages."""
@@ -73,13 +74,61 @@ class SecureDBHandler:
         # Set secure permissions if file exists
         if os.path.exists(self.db_path):
             os.chmod(self.db_path, 0o600)
+            
+        # Create execution_log table if it doesn't exist
+        self._ensure_log_table()
     
-    def get_connection(self) -> sqlite3.Connection:
-        """Get a secure database connection."""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA journal_mode=WAL")  # Enable Write-Ahead Logging
-        conn.execute("PRAGMA synchronous=NORMAL")  # Balance durability and performance
-        return conn
+    def _ensure_log_table(self):
+        """Ensure the execution_log table exists in the database"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Create the execution_log table if it doesn't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS execution_log (
+                    log_entry_id TEXT PRIMARY KEY,
+                    execution_id TEXT,
+                    timestamp TEXT,
+                    level TEXT,
+                    module TEXT,
+                    function TEXT,
+                    message TEXT,
+                    error_details TEXT,
+                    traceability_id TEXT,
+                    execution_run_id TEXT,
+                    test_case_name TEXT
+                )
+            ''')
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error creating execution_log table: {e}")
+    
+    def get_connection(self) -> Union[sqlite3.Connection, jaydebeapi.Connection]:
+        """Get a database connection"""
+        config_data = config.config  # Use the config property to get the dictionary
+        db_config = config_data['database']
+        db2use = db_config.get('db2use', 'db1').lower()
+        selected_db = db_config.get(db2use, db_config['db1'])
+        db_type = selected_db.get('type', 'sqlite').lower()
+
+        if db_type == 'sqlserver':
+            jdbc_url = f"jdbc:sqlserver://{selected_db['server']}:{selected_db['port']};databaseName={selected_db['database']}"
+            jar_path = os.path.join('drivers', 'mssql-jdbc-12.6.2.jre11.jar')
+            
+            if not os.path.exists(jar_path):
+                raise FileNotFoundError(f"JDBC driver not found at {jar_path}")
+                
+            return jaydebeapi.connect(
+                "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+                jdbc_url,
+                [selected_db['username'], selected_db['password']],
+                jar_path
+            )
+        else:
+            return sqlite3.connect(selected_db['path'], timeout=selected_db.get('timeout', 30))
     
     def log_to_db(self, level: str, msg: str, context: Dict[str, Any]) -> None:
         """Securely log message to database with sanitization."""
@@ -122,6 +171,7 @@ class SecureDBHandler:
                 
                 conn.commit()
             finally:
+                cursor.close()
                 conn.close()
         except Exception as e:
             # Log to console without sensitive data
@@ -387,7 +437,7 @@ class Logger:
         self.logger.addHandler(console_handler)
         
         # Add database handler
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = self.get_connection()
         self._ensure_log_table()
     
     def _ensure_log_table(self):

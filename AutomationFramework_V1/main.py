@@ -16,6 +16,7 @@ import yaml
 # Import framework utilities
 from utils.banner import print_intro
 from utils.logger import logger
+from utils.config_loader import load_config
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
@@ -96,16 +97,75 @@ class AutomationFramework:
             # Create a new script to list scheduled tests
             return self._list_scheduled_tests()
         
-        cmd = ["python3", "bin/run_scheduler.py"]
         if operation == "add":
-            cmd.extend(["--add"])
             if kwargs.get("traceability_id"):
-                cmd.extend(["--traceability_id", kwargs["traceability_id"]])
-            if kwargs.get("interval"):
-                cmd.extend(["--interval", kwargs["interval"]])
-            if kwargs.get("time"):
-                cmd.extend(["--time", kwargs["time"]])
-        elif operation == "run":
+                # Handle traceability ID based scheduling
+                from utils.db_handler import DBHandler
+                from utils.scheduler_handler import SchedulerHandler
+                from utils.custom_logger import get_logger
+                
+                # Initialize logger
+                logger = get_logger()
+                
+                try:
+                    # Initialize handlers
+                    db_handler = DBHandler()
+                    scheduler = SchedulerHandler(db_handler=db_handler)
+                    
+                    # Get test case details from database
+                    cursor = db_handler.conn.cursor()
+                    cursor.execute('''
+                    SELECT yaml_file_path, test_case_name, sid
+                    FROM testcase
+                    WHERE traceability_id = ?
+                    ''', (kwargs["traceability_id"],))
+                    
+                    result = cursor.fetchone()
+                    if not result:
+                        logger.error(f"No test case found with traceability ID {kwargs['traceability_id']}")
+                        return 1
+                    
+                    yaml_file_path, test_case_name, sid = result
+                    
+                    # Schedule the test case
+                    schedule_id = scheduler.schedule_test_case(
+                        yaml_file_path=yaml_file_path,
+                        frequency=kwargs.get("frequency", "daily"),
+                        username=sid,
+                        day_of_week=kwargs.get("day_of_week"),
+                        day_of_month=kwargs.get("day_of_month")
+                    )
+                    
+                    if schedule_id:
+                        logger.info(f"Test case '{test_case_name}' has been scheduled with ID: {schedule_id}")
+                        return 0
+                    else:
+                        logger.error("Failed to schedule test case")
+                        return 1
+                        
+                except Exception as e:
+                    logger.error(f"Error scheduling test case: {str(e)}")
+                    return 1
+                finally:
+                    db_handler.close()
+            else:
+                # Handle YAML based scheduling
+                cmd = ["python3", "bin/add_to_scheduler.py"]
+                if kwargs.get("yaml_file"):
+                    cmd.append(kwargs["yaml_file"])
+                if kwargs.get("frequency"):
+                    cmd.extend(["--frequency", kwargs["frequency"]])
+                if kwargs.get("day_of_week"):
+                    cmd.extend(["--day-of-week", kwargs["day_of_week"]])
+                if kwargs.get("day_of_month"):
+                    cmd.extend(["--day-of-month", kwargs["day_of_month"]])
+                if kwargs.get("force"):
+                    cmd.append("--force")
+                return run_command(" ".join(cmd), "Adding test case to scheduler")
+        
+        # For other operations, use run_scheduler.py
+        cmd = ["python3", "bin/run_scheduler.py"]
+        if operation == "run":
             cmd.extend(["--run-now"])
         elif operation == "remove":
             if kwargs.get("schedule_id"):
@@ -342,73 +402,149 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
             return 1
 
     def interactive_menu(self):
-        """Display interactive menu for framework operations."""
+        """Display the interactive menu and handle user input."""
         while True:
             print_header()
+            role = load_config().get("user", {}).get("role", "developer").lower()
+            
             print("=== TEST EXECUTION ===")
             print("1.  Run Single Test Case")
             print("2.  Run Scheduled Test Case Now")
             print("3.  Run Visual Test Execution")
             print("4.  Run Tests in Parallel")
-            print("\n=== SCHEDULER OPERATIONS ===")
-            print("5.  Add Test to Scheduler")
-            print("6.  Add Test to Scheduler via YAML")
-            print("7.  List Scheduled Tests")
-            print("8.  Remove Scheduled Test")
-            print("9.  Run Scheduled Tests")
-            print("\n=== PLUGIN OPERATIONS ===")
-            print("10. List Available Plugins")
-            print("11. Run Plugin")
-            print("12. Create New Plugin")
-            print("\n=== FILE OPERATIONS ===")
-            print("13. Run File Converter")
-            print("14. Clean Project Files")
-            print("\n=== FRAMEWORK SELF-TESTING ===")
-            print("15. Run Internal Framework Tests (Tests from 'tests/' directory)")
-            print("16. Run Framework Self-Tests (Core functionality tests with detailed reporting)")
-            print("17. Run Comprehensive Framework Tests (All components including converters)")
-            print("\n=== FRAMEWORK SUPPORT ===")
-            print("18. Show Framework Architecture")
-            print("19. Show Flow Chart")
-            print("20. Show Directory Structure")
-            print("21. Show Format Versions")
-            print("22. Show Examples")
-            print("23. Show Configuration Examples")
-            print("24. List Services")
-            print("\n=== HELP & MAINTENANCE ===")
-            print("25. Show Framework Help")
-            print("26. Show Available Commands")
-            print("27. Exit")
+            print()
+            
+            print("=== SCHEDULER OPERATIONS ===")
+            print("5.  Add Test to Scheduler (by Traceability ID)")
+            print("6.  Add Test to Scheduler (by YAML with Custom Schedule)")
+            print("7.  Add Test to Scheduler (by YAML with Default Schedule)")
+            print("8.  List Scheduled Tests")
+            print("9.  Remove Scheduled Test")
+            print("10. Run Scheduled Tests")
+            print()
+            
+            print("=== PLUGIN OPERATIONS ===")
+            print("11. List Available Plugins")
+            print("12. Run Plugin")
+            print("13. Create New Plugin")
+            print()
+            
+            print("=== FILE OPERATIONS ===")
+            print("14. Run File Converter")
+            print("15. Clean Project Files")
+            print()
+            
+            print("=== FRAMEWORK SELF-TESTING ===")
+            if role == "developer":
+                print("16. Run Internal Framework Tests")
+                print("17. Run Framework Self-Tests")
+                print("18. Run Comprehensive Framework Tests")
+            else:
+                print("16. [DISABLED]")
+                print("17. [DISABLED]")
+                print("18. [DISABLED]")
+            print()
+            
+            print("=== FRAMEWORK SUPPORT ===")
+            print("19. Show Framework Architecture")
+            print("20. Show Flow Chart")
+            print("21. Show Directory Structure")
+            print("22. Show Format Versions")
+            print("23. Show Examples")
+            print("24. Show Configuration Examples")
+            print("25. List Services")
+            print()
+            
+            print("=== HELP & MAINTENANCE ===")
+            print("26. Show Framework Help")
+            print("27. Show Available Commands")
+            print("28. Exit")
+            print()
             
             try:
-                choice = input("\nEnter your choice (1-27): ").strip()
+                choice = input("Enter your choice (1-28): ").strip()
                 
-                if choice == "1":
+                # Handle exit option
+                if choice == "28":
+                    print("\nThank you for using the OneTest Framework. Goodbye!")
+                    sys.exit(0)
+                
+                # Validate input is a number
+                if not choice.isdigit():
+                    print("\nInvalid choice. Please enter a number between 1 and 28.")
+                    input("\nPress Enter to return to main menu...")
+                    continue
+                
+                choice = int(choice)
+                
+                # Validate number range
+                if choice < 1 or choice > 28:
+                    print("\nInvalid choice. Please enter a number between 1 and 28.")
+                    input("\nPress Enter to return to main menu...")
+                    continue
+                
+                if role == "tester" and choice in [16, 17, 18]:
+                    print("Access denied for testers.")
+                    input("\nPress Enter to return to main menu...")
+                    continue
+                
+                if choice == 1:
                     self.show_option_banner("RUN SINGLE TEST CASE", "Execute a specific test case by providing the test file path")
                     test_file = input("Enter test file path (or press Enter for all): ").strip()
                     self.run_tests(test_file)
-                elif choice == "2":
+                elif choice == 2:
                     self.show_option_banner("RUN SCHEDULED TEST CASE NOW", "Execute all scheduled test cases immediately")
                     self.run_scheduler_operations("run")
-                elif choice == "3":
+                elif choice == 3:
                     self.show_option_banner("RUN VISUAL TEST EXECUTION", "Execute tests with visual progress indicators")
                     test_file = input("Enter test file path (or press Enter for all): ").strip()
                     debug = input("Enable debug mode? (y/N): ").lower() == 'y'
                     self.run_visual_tests(test_file, debug)
-                elif choice == "4":
+                elif choice == 4:
                     self.show_option_banner("RUN TESTS IN PARALLEL", "Execute multiple tests simultaneously for faster results")
                     workers = input("Enter number of parallel workers (default 2): ").strip()
                     workers = int(workers) if workers.isdigit() else 2
                     self.run_tests(parallel=workers)
-                elif choice == "5":
-                    self.show_option_banner("ADD TEST TO SCHEDULER", "Schedule a test to run automatically at specified intervals")
+                elif choice == 5:
+                    self.show_option_banner("ADD TEST TO SCHEDULER (BY TRACEABILITY ID)", "Schedule a test using its traceability ID")
                     traceability_id = input("Enter traceability ID: ").strip()
-                    interval = input("Enter interval (daily/weekly/monthly): ").strip()
-                    time = input("Enter time (HH:MM): ").strip()
-                    self.run_scheduler_operations("add", traceability_id=traceability_id,
-                                             interval=interval, time=time)
-                elif choice == "6":
-                    self.show_option_banner("ADD TEST TO SCHEDULER VIA YAML", "Schedule a test case by providing a YAML file")
+                    if not traceability_id:
+                        print("Traceability ID is required")
+                        continue
+                    
+                    frequency = input("Enter frequency (daily/weekly/monthly) [daily]: ").strip() or "daily"
+                    
+                    if frequency == "weekly":
+                        day_of_week = input("Enter day of week (1-7, where 1=Monday) [1]: ").strip() or "1"
+                        self.run_scheduler_operations("add", traceability_id=traceability_id, frequency=frequency, day_of_week=day_of_week)
+                    elif frequency == "monthly":
+                        day_of_month = input("Enter day of month (1-31) [1]: ").strip() or "1"
+                        self.run_scheduler_operations("add", traceability_id=traceability_id, frequency=frequency, day_of_month=day_of_month)
+                    else:
+                        self.run_scheduler_operations("add", traceability_id=traceability_id, frequency=frequency)
+                elif choice == 6:
+                    self.show_option_banner("ADD TEST TO SCHEDULER (BY YAML WITH CUSTOM SCHEDULE)", "Schedule a test case with custom scheduling parameters")
+                    yaml_file = input("Enter YAML file path: ").strip()
+                    if not yaml_file:
+                        print("YAML file path is required")
+                        continue
+                    
+                    if not os.path.exists(yaml_file):
+                        print(f"YAML file not found: {yaml_file}")
+                        continue
+                    
+                    frequency = input("Enter frequency (daily/weekly/monthly) [daily]: ").strip() or "daily"
+                    
+                    if frequency == "weekly":
+                        day_of_week = input("Enter day of week (1-7, where 1=Monday) [1]: ").strip() or "1"
+                        self.run_scheduler_operations("add", yaml_file=yaml_file, frequency=frequency, day_of_week=day_of_week)
+                    elif frequency == "monthly":
+                        day_of_month = input("Enter day of month (1-31) [1]: ").strip() or "1"
+                        self.run_scheduler_operations("add", yaml_file=yaml_file, frequency=frequency, day_of_month=day_of_month)
+                    else:
+                        self.run_scheduler_operations("add", yaml_file=yaml_file, frequency=frequency)
+                elif choice == 7:
+                    self.show_option_banner("ADD TEST TO SCHEDULER (BY YAML WITH DEFAULT SCHEDULE)", "Schedule a test case using scheduler settings from YAML file")
                     yaml_file = input("Enter YAML file path: ").strip()
                     if not yaml_file:
                         print("YAML file path is required")
@@ -420,87 +556,81 @@ def run(context: Dict[str, Any]) -> Dict[str, Any]:
                     
                     # Simply pass the YAML file to add_to_scheduler.py
                     # It will read the scheduler configuration from the YAML file
-                    cmd = ["python3", "add_to_scheduler.py", yaml_file]
+                    cmd = ["python3", "bin/add_to_scheduler.py", yaml_file]
                     run_command(" ".join(cmd), "Adding test case to scheduler")
-                elif choice == "7":
+                elif choice == 8:
                     self.show_option_banner("LIST SCHEDULED TESTS", "Display all tests scheduled for automatic execution")
                     self.run_scheduler_operations("list")
-                elif choice == "8":
+                elif choice == 9:
                     self.show_option_banner("REMOVE SCHEDULED TEST", "Remove a test from the scheduler")
                     schedule_id = input("Enter schedule ID to remove: ").strip()
                     self.run_scheduler_operations("remove", schedule_id=schedule_id)
-                elif choice == "9":
+                elif choice == 10:
                     self.show_option_banner("RUN SCHEDULED TESTS", "Manually trigger execution of scheduled tests")
                     self.run_scheduler_operations("run")
-                elif choice == "10":
+                elif choice == 11:
                     self.show_option_banner("LIST AVAILABLE PLUGINS", "Display all available data transformation plugins")
                     self.run_plugin_operations("list")
-                elif choice == "11":
+                elif choice == 12:
                     self.show_option_banner("RUN PLUGIN", "Execute a specific plugin for data transformation")
                     config = input("Enter plugin configuration file: ").strip()
                     self.run_plugin_operations("run", config=config)
-                elif choice == "12":
+                elif choice == 13:
                     self.show_option_banner("CREATE NEW PLUGIN", "Create a new data transformation plugin template")
                     name = input("Enter plugin name (without .py): ").strip()
                     self.run_plugin_operations("create", name=name)
-                elif choice == "13":
+                elif choice == 14:
                     self.show_option_banner("RUN FILE CONVERTER", "Convert data between different file formats")
                     config = input("Enter converter configuration: ").strip()
                     input_file = input("Enter input file path (optional): ").strip()
                     output_file = input("Enter output file path (optional): ").strip()
                     self.run_file_converter(config, input_file or None, output_file or None)
-                elif choice == "14":
+                elif choice == 15:
                     self.show_option_banner("CLEAN PROJECT FILES", "Remove temporary files and clean project workspace")
                     self.clean_project()
-                elif choice == "15":
+                elif choice == 16:
                     self.show_option_banner("RUN INTERNAL FRAMEWORK TESTS", "Run tests that validate the framework's internal functionality")
                     verbose = input("Enable verbose output? (y/N): ").lower() == 'y'
                     self.run_internal_framework_tests(verbose, console_output=True)
-                elif choice == "16":
+                elif choice == 17:
                     self.show_option_banner("RUN FRAMEWORK SELF-TESTS", "Run core functionality tests with detailed reporting")
                     verbose = input("Enable verbose output? (y/N): ").lower() == 'y'
                     skip_problematic = input("Skip problematic tests? (Y/n): ").lower() != 'n'
                     self.run_framework_self_tests(verbose, console_output=True, skip_problematic=skip_problematic)
-                elif choice == "17":
+                elif choice == 18:
                     self.show_option_banner("RUN COMPREHENSIVE FRAMEWORK TESTS", "Run tests for all framework components including converters")
                     include_all = input("Include all tests (including potentially problematic ones)? (y/N): ").lower() == 'y'
                     verbose = input("Enable verbose output? (y/N): ").lower() == 'y'
                     self.run_comprehensive_tests(include_all=include_all, verbose=verbose)
-                elif choice == "18":
+                elif choice == 19:
                     self.show_option_banner("SHOW FRAMEWORK ARCHITECTURE", "Display the overall architecture diagram of the framework")
                     run_command("python3 helpers/framework_help.py --architecture", "Showing framework architecture")
-                elif choice == "19":
+                elif choice == 20:
                     self.show_option_banner("SHOW FLOW CHART", "Display the flow chart of test execution process")
                     run_command("python3 helpers/framework_help.py --flow", "Showing framework flow chart")
-                elif choice == "20":
+                elif choice == 21:
                     self.show_option_banner("SHOW DIRECTORY STRUCTURE", "Display the structure of project directories")
                     run_command("python3 helpers/framework_help.py --structure", "Showing directory structure")
-                elif choice == "21":
+                elif choice == "22":
                     self.show_option_banner("SHOW FORMAT VERSIONS", "Display supported file format versions")
                     run_command("python3 helpers/framework_help.py --formats", "Showing format versions")
-                elif choice == "22":
+                elif choice == "23":
                     self.show_option_banner("SHOW EXAMPLES", "Display usage examples for the framework")
                     run_command("python3 helpers/framework_help.py --examples", "Showing framework examples")
-                elif choice == "23":
+                elif choice == "24":
                     self.show_option_banner("SHOW CONFIGURATION EXAMPLES", "Display example configuration files")
                     run_command("python3 helpers/framework_help.py --configs", "Showing configuration examples")
-                elif choice == "24":
+                elif choice == "25":
                     self.show_option_banner("LIST SERVICES", "Display available services integrated with the framework")
                     run_command("python3 helpers/framework_help.py --services", "Listing available services")
-                elif choice == "25":
+                elif choice == "26":
                     self.show_option_banner("SHOW FRAMEWORK HELP", "Display comprehensive help information")
                     self.show_help()
-                elif choice == "26":
+                elif choice == "27":
                     self.show_option_banner("SHOW AVAILABLE COMMANDS", "Display all available command-line options")
                     run_command("python3 helpers/command_helper.py --list", "Showing available commands")
-                elif choice == "27":
-                    clear_screen()
-                    print("\nExiting framework. Goodbye!")
-                    sys.exit(0)
-                else:
-                    print("\nInvalid choice. Please enter a number between 1 and 27.")
                 
-                if choice != "27":
+                if choice != "28":
                     input("\nPress Enter to return to main menu...")
             
             except ValueError as e:
