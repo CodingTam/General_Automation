@@ -24,6 +24,26 @@ def check_sql_server_dependencies():
         logger.error(f"Error checking SQL Server dependencies: {e}")
         return False
 
+def test_connection(conn, db_type):
+    """Test database connection and print version."""
+    try:
+        cursor = conn.cursor()
+        if db_type == 'SQL':
+            # Use a more JDBC-compatible version check query
+            cursor.execute("SELECT SERVERPROPERTY('ProductVersion') as version")
+        else:
+            cursor.execute("SELECT sqlite_version() as version")
+        
+        version = cursor.fetchone()[0]
+        print(f"\n✅ Successfully connected to {db_type} database")
+        print(f"Database version: {version}")
+        return True
+    except Exception as e:
+        print(f"\n❌ Error testing {db_type} connection: {str(e)}")
+        return False
+    finally:
+        cursor.close()
+
 def test_connection():
     """Test database connection based on current configuration."""
     try:
@@ -45,7 +65,7 @@ def test_connection():
         if current_db.upper() == 'SQL':
             # SQL Server test query
             cursor = conn.cursor()
-            cursor.execute("SELECT @@version as version")
+            cursor.execute("SELECT SERVERPROPERTY('ProductVersion') as version")
             version = cursor.fetchone()[0]
             logger.info(f"Successfully connected to SQL Server. Version: {version}")
             cursor.close()
@@ -53,7 +73,7 @@ def test_connection():
         else:
             # SQLite test query
             cursor = conn.cursor()
-            cursor.execute("SELECT sqlite_version()")
+            cursor.execute("SELECT sqlite_version() as version")
             version = cursor.fetchone()[0]
             logger.info(f"Successfully connected to SQLite. Version: {version}")
             cursor.close()
