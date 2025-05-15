@@ -24,7 +24,7 @@ def check_sql_server_dependencies():
         logger.error(f"Error checking SQL Server dependencies: {e}")
         return False
 
-def test_connection(conn, db_type):
+def test_db_version(conn, db_type):
     """Test database connection and print version."""
     try:
         cursor = conn.cursor()
@@ -62,28 +62,20 @@ def test_connection():
         # Get database connection
         conn = get_db_connection()
         
-        if current_db.upper() == 'SQL':
-            # SQL Server test query
-            cursor = conn.cursor()
-            cursor.execute("SELECT SERVERPROPERTY('ProductVersion') as version")
-            version = cursor.fetchone()[0]
-            logger.info(f"Successfully connected to SQL Server. Version: {version}")
-            cursor.close()
-            conn.close()
-        else:
-            # SQLite test query
-            cursor = conn.cursor()
-            cursor.execute("SELECT sqlite_version() as version")
-            version = cursor.fetchone()[0]
-            logger.info(f"Successfully connected to SQLite. Version: {version}")
-            cursor.close()
-            conn.close()
-
-        logger.info("Connection test completed successfully")
+        # Use the helper function to test the connection
+        success = test_db_version(conn, current_db.upper())
         
+        if success:
+            logger.info("Connection test completed successfully")
+        else:
+            logger.error("Connection test failed")
+            
     except Exception as e:
         logger.error(f"Connection test failed: {str(e)}")
         raise
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 def test_both_connections():
     """Test both database connections by temporarily modifying the configuration."""
@@ -96,6 +88,13 @@ def test_both_connections():
     try:
         # Test SQLite connection
         logger.info("\n=== Testing SQLite Connection (db1) ===")
+        config = load_config()
+        config['db2use'] = 'db1'
+        
+        # Save temporary config
+        with open('configs/framework_config.yaml', 'w') as f:
+            yaml.dump(config, f)
+        
         test_connection()
         
         # Temporarily switch to SQL Server
@@ -107,7 +106,6 @@ def test_both_connections():
         with open('configs/framework_config.yaml', 'w') as f:
             yaml.dump(config, f)
         
-        # Test SQL Server connection
         test_connection()
         
     finally:
