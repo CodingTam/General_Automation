@@ -50,7 +50,7 @@ def test_connection():
     try:
         # Load current configuration
         config = load_config()
-        db_key = config.get('db2use', 'db1').lower()
+        db_key = config['database'].get('db2use', 'db1').lower()
         logger.info(f"Testing connection for database: {db_key}")
 
         if db_key == 'db1':
