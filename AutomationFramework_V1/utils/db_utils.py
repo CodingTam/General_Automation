@@ -11,80 +11,85 @@ logger = logging.getLogger(__name__)
 
 def create_required_tables(conn: Union[sqlite3.Connection, jaydebeapi.Connection]) -> None:
     """Create all required tables if they don't exist."""
+    def table_exists_sqlserver(cursor, table_name):
+        cursor.execute(f"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{table_name}'")
+        return cursor.fetchone()[0] > 0
+
     cursor = conn.cursor()
-    
-    # Create scheduler table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS scheduler (
-        schedule_id TEXT PRIMARY KEY,
-        traceability_id TEXT,
-        yaml_file_path TEXT,
-        test_case_name TEXT,
-        sid TEXT,
-        table_name TEXT,
-        username TEXT,
-        frequency TEXT,
-        day_of_week INTEGER,
-        day_of_month INTEGER,
-        next_run_time TIMESTAMP,
-        last_run_time TIMESTAMP,
-        status TEXT,
-        enabled INTEGER DEFAULT 1,
-        created_at TIMESTAMP,
-        updated_at TIMESTAMP,
-        FOREIGN KEY (traceability_id) REFERENCES testcase(traceability_id)
-    )
-    ''')
-    
-    # Create module_execution_issues table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS module_execution_issues (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        execution_id TEXT NOT NULL,
-        test_case_id TEXT NOT NULL,
-        traceability_id TEXT,
-        user_id TEXT,
-        environment TEXT,
-        module_name TEXT NOT NULL,
-        module_type TEXT NOT NULL,
-        attempted_version TEXT,
-        framework_version TEXT,
-        tool_version TEXT,
-        plugin_version TEXT,
-        converter_version TEXT,
-        error_message TEXT,
-        stack_trace TEXT,
-        file_path TEXT,
-        additional_context TEXT,
-        resolution_status TEXT DEFAULT 'OPEN',
-        resolution_notes TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
-    
-    # Create version_fallback_decisions table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS version_fallback_decisions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        execution_id TEXT NOT NULL,
-        test_case_id TEXT NOT NULL,
-        traceability_id TEXT,
-        module_type TEXT NOT NULL,
-        operation_type TEXT NOT NULL,
-        initial_version TEXT NOT NULL,
-        fallback_version TEXT NOT NULL,
-        error_message TEXT,
-        successful BOOLEAN NOT NULL,
-        format_type TEXT,
-        file_path TEXT,
-        user_id TEXT,
-        environment TEXT,
-        decision_timestamp TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
-    
-    conn.commit()
-    logger.info("All required tables have been created")
+    try:
+        # Table definitions
+        tables = {
+            "scheduler": '''
+                schedule_id TEXT PRIMARY KEY,
+                traceability_id TEXT,
+                yaml_file_path TEXT,
+                test_case_name TEXT,
+                sid TEXT,
+                table_name TEXT,
+                username TEXT,
+                frequency TEXT,
+                day_of_week INTEGER,
+                day_of_month INTEGER,
+                next_run_time TIMESTAMP,
+                last_run_time TIMESTAMP,
+                status TEXT,
+                enabled INTEGER DEFAULT 1,
+                created_at TIMESTAMP,
+                updated_at TIMESTAMP
+            ''',
+            "module_execution_issues": '''
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                execution_id TEXT NOT NULL,
+                test_case_id TEXT NOT NULL,
+                traceability_id TEXT,
+                user_id TEXT,
+                environment TEXT,
+                module_name TEXT NOT NULL,
+                module_type TEXT NOT NULL,
+                attempted_version TEXT,
+                framework_version TEXT,
+                tool_version TEXT,
+                plugin_version TEXT,
+                converter_version TEXT,
+                error_message TEXT,
+                stack_trace TEXT,
+                file_path TEXT,
+                additional_context TEXT,
+                resolution_status TEXT DEFAULT 'OPEN',
+                resolution_notes TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            ''',
+            "version_fallback_decisions": '''
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                execution_id TEXT NOT NULL,
+                test_case_id TEXT NOT NULL,
+                traceability_id TEXT,
+                module_type TEXT NOT NULL,
+                operation_type TEXT NOT NULL,
+                initial_version TEXT NOT NULL,
+                fallback_version TEXT NOT NULL,
+                error_message TEXT,
+                successful BOOLEAN NOT NULL,
+                format_type TEXT,
+                file_path TEXT,
+                user_id TEXT,
+                environment TEXT,
+                decision_timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+            '''
+        }
+
+        for table_name, columns in tables.items():
+            if isinstance(conn, sqlite3.Connection):
+                create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({columns})"
+                cursor.execute(create_sql)
+            elif isinstance(conn, jaydebeapi.Connection):
+                if not table_exists_sqlserver(cursor, table_name):
+                    create_sql = f"CREATE TABLE {table_name} ({columns})"
+                    cursor.execute(create_sql)
+        conn.commit()
+        logger.info("All required tables have been created")
+    finally:
+        cursor.close()
 
 def get_db_connection() -> Union[sqlite3.Connection, jaydebeapi.Connection]:
     """
