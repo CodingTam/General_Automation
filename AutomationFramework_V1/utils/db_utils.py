@@ -141,6 +141,11 @@ def get_sql_server_connection(db_config: Dict[str, Any]) -> jaydebeapi.Connectio
     """Create and return jaydebeapi connection for SQL Server."""
     try:
         jdbc_url = f"jdbc:sqlserver://{db_config['server']}:{db_config['port']};databaseName={db_config['database']}"
+        if 'encrypt=true' not in jdbc_url:
+            jdbc_url += ';encrypt=true'
+        if 'trustServerCertificate=true' not in jdbc_url:
+            jdbc_url += ';trustServerCertificate=true'
+        
         jar_path = os.path.join('drivers', 'mssql-jdbc-12.6.2.jre11.jar')
         
         if not os.path.exists(jar_path):
@@ -203,6 +208,12 @@ def create_table_if_not_exists(conn: Union[sqlite3.Connection, Any],
                 port=sql_config['port'],
                 database=sql_config['database']
             )
+            
+            # Ensure required options are present
+            if 'encrypt=true' not in jdbc_url:
+                jdbc_url += ';encrypt=true'
+            if 'trustServerCertificate=true' not in jdbc_url:
+                jdbc_url += ';trustServerCertificate=true'
             
             # Create empty DataFrame with the desired schema
             from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType
@@ -288,6 +299,12 @@ def insert_data(conn: Union[sqlite3.Connection, Any],
                 port=sql_config['port'],
                 database=sql_config['database']
             )
+            
+            # Ensure required options are present
+            if 'encrypt=true' not in jdbc_url:
+                jdbc_url += ';encrypt=true'
+            if 'trustServerCertificate=true' not in jdbc_url:
+                jdbc_url += ';trustServerCertificate=true'
             
             # Convert data to DataFrame
             from pyspark.sql import Row

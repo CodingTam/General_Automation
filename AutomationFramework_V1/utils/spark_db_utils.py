@@ -33,9 +33,14 @@ def read_sql_table(spark: SparkSession, table_name: str, db_config: Dict[str, An
     This should only be used within Spark jobs.
     """
     try:
+        url = f"jdbc:sqlserver://{db_config['hostname']}:{db_config['port']};databaseName={db_config['database']}"
+        if 'encrypt=true' not in url:
+            url += ';encrypt=true'
+        if 'trustServerCertificate=true' not in url:
+            url += ';trustServerCertificate=true'
         return spark.read \
             .format("jdbc") \
-            .option("url", f"jdbc:sqlserver://{db_config['hostname']}:{db_config['port']};databaseName={db_config['database']}") \
+            .option("url", url) \
             .option("user", db_config['username']) \
             .option("password", db_config['password']) \
             .option("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver") \
@@ -51,9 +56,14 @@ def write_sql_table(df: SparkSession, table_name: str, db_config: Dict[str, Any]
     This should only be used within Spark jobs.
     """
     try:
+        url = f"jdbc:sqlserver://{db_config['hostname']}:{db_config['port']};databaseName={db_config['database']}"
+        if 'encrypt=true' not in url:
+            url += ';encrypt=true'
+        if 'trustServerCertificate=true' not in url:
+            url += ';trustServerCertificate=true'
         df.write \
             .format("jdbc") \
-            .option("url", f"jdbc:sqlserver://{db_config['hostname']}:{db_config['port']};databaseName={db_config['database']}") \
+            .option("url", url) \
             .option("user", db_config['username']) \
             .option("password", db_config['password']) \
             .option("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver") \

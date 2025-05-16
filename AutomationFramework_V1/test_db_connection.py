@@ -64,6 +64,10 @@ def test_connection():
             
             # SQL Server connection
             jdbc_url = f"jdbc:sqlserver://{db_config['server']}:{db_config['port']};databaseName={db_config['database']}"
+            if 'encrypt=true' not in jdbc_url:
+                jdbc_url += ';encrypt=true'
+            if 'trustServerCertificate=true' not in jdbc_url:
+                jdbc_url += ';trustServerCertificate=true'
             jar_path = os.path.join('drivers', 'mssql-jdbc-12.6.2.jre11.jar')
             
             conn = jaydebeapi.connect(
@@ -108,6 +112,10 @@ def test_all_connections():
                     continue
                     
                 jdbc_url = f"jdbc:sqlserver://{db_config['server']}:{db_config['port']};databaseName={db_config['database']}"
+                if 'encrypt=true' not in jdbc_url:
+                    jdbc_url += ';encrypt=true'
+                if 'trustServerCertificate=true' not in jdbc_url:
+                    jdbc_url += ';trustServerCertificate=true'
                 jar_path = os.path.join('drivers', 'mssql-jdbc-12.6.2.jre11.jar')
                 
                 conn = jaydebeapi.connect(

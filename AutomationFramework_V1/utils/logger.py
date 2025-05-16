@@ -116,6 +116,10 @@ class SecureDBHandler:
 
         if db_type == 'sqlserver':
             jdbc_url = f"jdbc:sqlserver://{selected_db['server']}:{selected_db['port']};databaseName={selected_db['database']}"
+            if 'encrypt=true' not in jdbc_url:
+                jdbc_url += ';encrypt=true'
+            if 'trustServerCertificate=true' not in jdbc_url:
+                jdbc_url += ';trustServerCertificate=true'
             jar_path = os.path.join('drivers', 'mssql-jdbc-12.6.2.jre11.jar')
             
             if not os.path.exists(jar_path):
