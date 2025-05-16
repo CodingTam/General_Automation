@@ -90,40 +90,39 @@ def get_db_connection() -> Union[sqlite3.Connection, jaydebeapi.Connection]:
     """
     Get database connection based on configuration.
     Returns either SQLite connection or SQL Server connection based on db2use setting and database type.
-    
-    The db2use setting specifies which database configuration to use.
-    Each database configuration has a 'type' field that can be:
-    - "sqlite": Use SQLite database
-    - "sqlserver": Use SQL Server database through jaydebeapi
     """
     config_data = config.config  # Use the config property to get the dictionary
     db_config = config_data['database']
     db2use = db_config.get('db2use', 'db1').lower()
-    
-    # Get the selected database configuration
-    selected_db = db_config.get(db2use, db_config['db1'])
-    db_type = selected_db.get('type', 'sqlite').lower()  # Default to sqlite if type not specified
+
+    # Select the correct database config
+    if db2use == 'db2':
+        selected_db = db_config.get('db2', db_config['db1'])
+        db_type = selected_db.get('type', 'sqlserver').lower()
+    else:
+        selected_db = db_config.get('db1')
+        db_type = selected_db.get('type', 'sqlite').lower()
 
     logger.info(f"Database selected from config: {db2use}")
     logger.info(f"Using {'SQL Server (DB2)' if db2use == 'db2' else 'SQLite (DB1)'}")
 
-    if db_type == 'sqlserver':
+    if db2use == 'db2' and db_type == 'sqlserver':
         try:
             conn = get_sql_server_connection(selected_db)
             logger.info(f"Connection object type: {type(conn)}")
-            return conn
         except Exception as e:
             logger.error(f"Failed to connect to DB2: {e}")
             raise RuntimeError("Cannot continue. Check DB2 settings or fallback logic.")
-    else:  # sqlite or any other type defaults to SQLite
-        conn = get_sqlite_connection(selected_db)
-        logger.info(f"Connection object type: {type(conn)}")
-        
-        # Enable foreign key constraints for SQLite
-        if isinstance(conn, sqlite3.Connection):
-            conn.execute("PRAGMA foreign_keys = ON")
-    
-    # Create required tables
+    else:
+        try:
+            conn = get_sqlite_connection(selected_db)
+            logger.info(f"Connection object type: {type(conn)}")
+            if isinstance(conn, sqlite3.Connection):
+                conn.execute("PRAGMA foreign_keys = ON")
+        except Exception as e:
+            logger.error(f"Failed to connect to SQLite: {e}")
+            raise RuntimeError("Cannot continue. Check DB1 settings or fallback logic.")
+
     create_required_tables(conn)
     return conn
 
@@ -145,12 +144,9 @@ def get_sql_server_connection(db_config: Dict[str, Any]) -> jaydebeapi.Connectio
             jdbc_url += ';encrypt=true'
         if 'trustServerCertificate=true' not in jdbc_url:
             jdbc_url += ';trustServerCertificate=true'
-        
         jar_path = os.path.join('drivers', 'mssql-jdbc-12.6.2.jre11.jar')
-        
         if not os.path.exists(jar_path):
             raise FileNotFoundError(f"JDBC driver not found at {jar_path}")
-            
         conn = jaydebeapi.connect(
             "com.microsoft.sqlserver.jdbc.SQLServerDriver",
             jdbc_url,
@@ -163,27 +159,20 @@ def get_sql_server_connection(db_config: Dict[str, Any]) -> jaydebeapi.Connectio
         logger.error(f"Error connecting to SQL Server database: {e}")
         raise
 
-def create_table_if_not_exists(conn: Union[sqlite3.Connection, Any], 
+def create_table_if_not_exists(conn: Union[sqlite3.Connection, jaydebeapi.Connection], 
                              table_name: str, 
                              columns: Dict[str, str]) -> None:
     """
     Create table if it doesn't exist in the database.
-    
     Args:
-        conn: Database connection (SQLite or SparkSession)
+        conn: Database connection (SQLite or SQL Server)
         table_name: Name of the table to create
         columns: Dictionary of column names and their SQL types
     """
-    config_data = config.config  # Use the config property to get the dictionary
-    db_config = config_data['database']
-    db2use = db_config.get('db2use', 'db1').lower()
-    
     if isinstance(conn, sqlite3.Connection):
-        # SQLite table creation (for both db1 and db3)
         column_defs = [f"{col_name} {col_type}" for col_name, col_type in columns.items()]
         columns_str = ", ".join(column_defs)
         create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({columns_str})"
-        
         try:
             cursor = conn.cursor()
             cursor.execute(create_table_sql)
@@ -194,87 +183,39 @@ def create_table_if_not_exists(conn: Union[sqlite3.Connection, Any],
             raise
         finally:
             cursor.close()
-    else:
-        # Check if this is a Spark session
+    elif isinstance(conn, jaydebeapi.Connection):
+        column_defs = [f"{col_name} {col_type}" for col_name, col_type in columns.items()]
+        columns_str = ", ".join(column_defs)
+        create_table_sql = f"IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='{table_name}' AND xtype='U') CREATE TABLE {table_name} ({columns_str})"
         try:
-            from pyspark.sql import SparkSession
-            if not isinstance(conn, SparkSession):
-                raise TypeError("Connection must be either SQLite connection or SparkSession")
-                
-            # SQL Server table creation through Spark
-            sql_config = db_config['db2']  # Only db2 uses SQL Server
-            jdbc_url = sql_config['jdbc_url'].format(
-                server=sql_config['server'],
-                port=sql_config['port'],
-                database=sql_config['database']
-            )
-            
-            # Ensure required options are present
-            if 'encrypt=true' not in jdbc_url:
-                jdbc_url += ';encrypt=true'
-            if 'trustServerCertificate=true' not in jdbc_url:
-                jdbc_url += ';trustServerCertificate=true'
-            
-            # Create empty DataFrame with the desired schema
-            from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType
-            
-            # Map SQL types to Spark types
-            type_mapping = {
-                'INTEGER': IntegerType(),
-                'VARCHAR': StringType(),
-                'FLOAT': DoubleType(),
-                # Add more type mappings as needed
-            }
-            
-            fields = [
-                StructField(col_name, type_mapping.get(col_type.split('(')[0], StringType()), True)
-                for col_name, col_type in columns.items()
-            ]
-            schema = StructType(fields)
-            
-            # Create empty DataFrame and write to SQL Server
-            empty_df = conn.createDataFrame([], schema)
-            empty_df.write \
-                .format("jdbc") \
-                .option("url", jdbc_url) \
-                .option("dbtable", table_name) \
-                .option("user", sql_config['username']) \
-                .option("password", sql_config['password']) \
-                .option("driver", sql_config['driver']) \
-                .mode("ignore") \
-                .save()
-            
+            cursor = conn.cursor()
+            cursor.execute(create_table_sql)
+            conn.commit()
             logger.info(f"Table {table_name} created or already exists in SQL Server")
-        except ImportError:
-            logger.error("PySpark is not installed. Spark functionality is not available.")
-            raise
         except Exception as e:
             logger.error(f"Error creating table {table_name} in SQL Server: {e}")
             raise
+        finally:
+            cursor.close()
+    else:
+        raise TypeError("Connection must be either SQLite or SQL Server (jaydebeapi) connection.")
 
-def insert_data(conn: Union[sqlite3.Connection, Any],
+def insert_data(conn: Union[sqlite3.Connection, jaydebeapi.Connection],
                 table_name: str,
                 data: list,
                 columns: list) -> None:
     """
     Insert data into the specified table.
-    
     Args:
-        conn: Database connection (SQLite or SparkSession)
+        conn: Database connection (SQLite or SQL Server)
         table_name: Name of the table to insert into
         data: List of tuples containing the data to insert
         columns: List of column names
     """
-    config_data = config.config  # Use the config property to get the dictionary
-    db_config = config_data['database']
-    db2use = db_config.get('db2use', 'db1').lower()
-    
     if isinstance(conn, sqlite3.Connection):
-        # SQLite data insertion (for both db1 and db3)
         placeholders = ", ".join(["?" for _ in columns])
         columns_str = ", ".join(columns)
         insert_sql = f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders})"
-        
         try:
             cursor = conn.cursor()
             cursor.executemany(insert_sql, data)
@@ -285,47 +226,19 @@ def insert_data(conn: Union[sqlite3.Connection, Any],
             raise
         finally:
             cursor.close()
-    else:
-        # Check if this is a Spark session
+    elif isinstance(conn, jaydebeapi.Connection):
+        placeholders = ", ".join(["?" for _ in columns])
+        columns_str = ", ".join(columns)
+        insert_sql = f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders})"
         try:
-            from pyspark.sql import SparkSession
-            if not isinstance(conn, SparkSession):
-                raise TypeError("Connection must be either SQLite connection or SparkSession")
-                
-            # SQL Server data insertion through Spark
-            sql_config = db_config['db2']  # Only db2 uses SQL Server
-            jdbc_url = sql_config['jdbc_url'].format(
-                server=sql_config['server'],
-                port=sql_config['port'],
-                database=sql_config['database']
-            )
-            
-            # Ensure required options are present
-            if 'encrypt=true' not in jdbc_url:
-                jdbc_url += ';encrypt=true'
-            if 'trustServerCertificate=true' not in jdbc_url:
-                jdbc_url += ';trustServerCertificate=true'
-            
-            # Convert data to DataFrame
-            from pyspark.sql import Row
-            rows = [Row(**dict(zip(columns, row))) for row in data]
-            df = conn.createDataFrame(rows)
-            
-            # Write DataFrame to SQL Server
-            df.write \
-                .format("jdbc") \
-                .option("url", jdbc_url) \
-                .option("dbtable", table_name) \
-                .option("user", sql_config['username']) \
-                .option("password", sql_config['password']) \
-                .option("driver", sql_config['driver']) \
-                .mode("append") \
-                .save()
-            
+            cursor = conn.cursor()
+            cursor.executemany(insert_sql, data)
+            conn.commit()
             logger.info(f"Successfully inserted {len(data)} rows into SQL Server table {table_name}")
-        except ImportError:
-            logger.error("PySpark is not installed. Spark functionality is not available.")
-            raise
         except Exception as e:
             logger.error(f"Error inserting data into SQL Server table {table_name}: {e}")
-            raise 
+            raise
+        finally:
+            cursor.close()
+    else:
+        raise TypeError("Connection must be either SQLite or SQL Server (jaydebeapi) connection.") 
