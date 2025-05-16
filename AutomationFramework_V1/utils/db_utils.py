@@ -186,12 +186,18 @@ def create_table_if_not_exists(conn: Union[sqlite3.Connection, jaydebeapi.Connec
     elif isinstance(conn, jaydebeapi.Connection):
         column_defs = [f"{col_name} {col_type}" for col_name, col_type in columns.items()]
         columns_str = ", ".join(column_defs)
-        create_table_sql = f"IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='{table_name}' AND xtype='U') CREATE TABLE {table_name} ({columns_str})"
+        table_exists_query = f"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{table_name}'"
+        create_table_sql = f"CREATE TABLE {table_name} ({columns_str})"
         try:
             cursor = conn.cursor()
-            cursor.execute(create_table_sql)
-            conn.commit()
-            logger.info(f"Table {table_name} created or already exists in SQL Server")
+            cursor.execute(table_exists_query)
+            exists = cursor.fetchone()[0]
+            if not exists:
+                cursor.execute(create_table_sql)
+                conn.commit()
+                logger.info(f"Table {table_name} created in SQL Server")
+            else:
+                logger.info(f"Table {table_name} already exists in SQL Server")
         except Exception as e:
             logger.error(f"Error creating table {table_name} in SQL Server: {e}")
             raise
