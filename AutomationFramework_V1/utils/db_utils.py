@@ -17,7 +17,8 @@ def create_required_tables(conn: Union[sqlite3.Connection, jaydebeapi.Connection
 
     cursor = conn.cursor()
     try:
-        tables = {
+        # Table definitions for SQLite (original types)
+        tables_sqlite = {
             "scheduler": '''
                 schedule_id TEXT PRIMARY KEY,
                 traceability_id TEXT,
@@ -77,16 +78,78 @@ def create_required_tables(conn: Union[sqlite3.Connection, jaydebeapi.Connection
                 decision_timestamp TEXT DEFAULT CURRENT_TIMESTAMP
             '''
         }
+        # Table definitions for SQL Server (SQL Server compatible types)
+        tables_sqlserver = {
+            "scheduler": '''
+                schedule_id VARCHAR(255) PRIMARY KEY,
+                traceability_id VARCHAR(255),
+                yaml_file_path VARCHAR(1024),
+                test_case_name VARCHAR(255),
+                sid VARCHAR(255),
+                table_name VARCHAR(255),
+                username VARCHAR(255),
+                frequency VARCHAR(50),
+                day_of_week INT,
+                day_of_month INT,
+                next_run_time DATETIME2,
+                last_run_time DATETIME2,
+                status VARCHAR(50),
+                enabled BIT DEFAULT 1,
+                created_at DATETIME2,
+                updated_at DATETIME2,
+                -- Only one rowversion/timestamp column allowed, add if needed
+                -- row_version ROWVERSION,
+                -- Foreign key constraint can be added separately if needed
+            ''',
+            "module_execution_issues": '''
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                execution_id VARCHAR(255) NOT NULL,
+                test_case_id VARCHAR(255) NOT NULL,
+                traceability_id VARCHAR(255),
+                user_id VARCHAR(255),
+                environment VARCHAR(255),
+                module_name VARCHAR(255) NOT NULL,
+                module_type VARCHAR(255) NOT NULL,
+                attempted_version VARCHAR(255),
+                framework_version VARCHAR(255),
+                tool_version VARCHAR(255),
+                plugin_version VARCHAR(255),
+                converter_version VARCHAR(255),
+                error_message VARCHAR(MAX),
+                stack_trace VARCHAR(MAX),
+                file_path VARCHAR(1024),
+                additional_context VARCHAR(MAX),
+                resolution_status VARCHAR(50) DEFAULT 'OPEN',
+                resolution_notes VARCHAR(MAX),
+                created_at DATETIME2 DEFAULT SYSDATETIME()
+            ''',
+            "version_fallback_decisions": '''
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                execution_id VARCHAR(255) NOT NULL,
+                test_case_id VARCHAR(255) NOT NULL,
+                traceability_id VARCHAR(255),
+                module_type VARCHAR(255) NOT NULL,
+                operation_type VARCHAR(255) NOT NULL,
+                initial_version VARCHAR(255) NOT NULL,
+                fallback_version VARCHAR(255) NOT NULL,
+                error_message VARCHAR(MAX),
+                successful BIT NOT NULL,
+                format_type VARCHAR(255),
+                file_path VARCHAR(1024),
+                user_id VARCHAR(255),
+                environment VARCHAR(255),
+                decision_timestamp DATETIME2 DEFAULT SYSDATETIME()
+            '''
+        }
 
-        for table_name, columns in tables.items():
+        for table_name in tables_sqlite.keys():
             if isinstance(conn, sqlite3.Connection):
-                create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({columns})"
+                create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({tables_sqlite[table_name]})"
                 cursor.execute(create_sql)
             elif isinstance(conn, jaydebeapi.Connection):
                 if not table_exists_sqlserver(cursor, table_name):
-                    create_sql = f"CREATE TABLE {table_name} ({columns})"
+                    create_sql = f"CREATE TABLE {table_name} ({tables_sqlserver[table_name]})"
                     cursor.execute(create_sql)
-                # If the table exists, do nothing (do not try to alter or add columns)
         conn.commit()
         logger.info("All required tables have been created")
     finally:
