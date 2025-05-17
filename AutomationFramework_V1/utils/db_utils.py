@@ -78,7 +78,7 @@ def create_required_tables(conn: Union[sqlite3.Connection, jaydebeapi.Connection
                 decision_timestamp TEXT DEFAULT CURRENT_TIMESTAMP
             '''
         }
-        # Table definitions for SQL Server (SQL Server compatible types)
+        # Table definitions for SQL Server (SQL Server compatible types, all date/time fields use DATETIME2)
         tables_sqlserver = {
             "scheduler": '''
                 schedule_id VARCHAR(255) PRIMARY KEY,
@@ -96,9 +96,7 @@ def create_required_tables(conn: Union[sqlite3.Connection, jaydebeapi.Connection
                 status VARCHAR(50),
                 enabled BIT DEFAULT 1,
                 created_at DATETIME2,
-                updated_at DATETIME2,
-                -- Only one rowversion/timestamp column allowed, add if needed
-                -- row_version ROWVERSION,
+                updated_at DATETIME2
                 -- Foreign key constraint can be added separately if needed
             ''',
             "module_execution_issues": '''
