@@ -17,7 +17,6 @@ def create_required_tables(conn: Union[sqlite3.Connection, jaydebeapi.Connection
 
     cursor = conn.cursor()
     try:
-        # Table definitions
         tables = {
             "scheduler": '''
                 schedule_id TEXT PRIMARY KEY,
@@ -35,7 +34,8 @@ def create_required_tables(conn: Union[sqlite3.Connection, jaydebeapi.Connection
                 status TEXT,
                 enabled INTEGER DEFAULT 1,
                 created_at TIMESTAMP,
-                updated_at TIMESTAMP
+                updated_at TIMESTAMP,
+                FOREIGN KEY (traceability_id) REFERENCES testcase(traceability_id)
             ''',
             "module_execution_issues": '''
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +86,7 @@ def create_required_tables(conn: Union[sqlite3.Connection, jaydebeapi.Connection
                 if not table_exists_sqlserver(cursor, table_name):
                     create_sql = f"CREATE TABLE {table_name} ({columns})"
                     cursor.execute(create_sql)
+                # If the table exists, do nothing (do not try to alter or add columns)
         conn.commit()
         logger.info("All required tables have been created")
     finally:
